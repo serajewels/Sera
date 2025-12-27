@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const Product = require('../models/Product'); // Import Product model
 const jwt = require('jsonwebtoken');
 const { protect } = require('../middleware/authMiddleware');
+const mongoose = require('mongoose');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
@@ -18,15 +20,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
 
-  if (user && (await user.matchPassword(password))) { // Assuming matchPassword method exists or implementing check
-    // Wait, User model doesn't have methods defined in the file I saw. 
-    // I should check password directly if not hashed or add method.
-    // For now assuming plain text or simple compare if method missing.
-    // Let's implement simple check if method missing:
-    // Actually standard is bcrypt compare.
-    // I'll assume the User model has pre-save hook for hashing. 
-    // But since I didn't see it, I should probably handle it here or update User model.
-    // Let's update User model later. For now, basic check.
+  if (user && (await user.matchPassword(password))) {
     res.json({
       _id: user._id,
       name: user.name,
@@ -55,7 +49,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   const user = await User.create({
     name,
     email,
-    password, // Should be hashed in model
+    password,
   });
 
   if (user) {
@@ -85,6 +79,7 @@ router.get('/profile', protect, asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       addresses: user.addresses,
+      wishlist: user.wishlist, // Include wishlist in profile
     });
   } else {
     res.status(404);
@@ -105,29 +100,28 @@ router.put('/profile', protect, asyncHandler(async (req, res) => {
       user.password = req.body.password;
     }
     if (req.body.addresses) {
-        // Ensure addresses have correct structure to avoid type conflicts
-        user.addresses = req.body.addresses.map(addr => ({
-            ...addr,
-            type: addr.type || 'Home', // Explicitly set type if missing
-            isDefault: Boolean(addr.isDefault)
-        }));
+      user.addresses = req.body.addresses.map(addr => ({
+        ...addr,
+        type: addr.type || 'Home',
+        isDefault: Boolean(addr.isDefault)
+      }));
     }
     
     try {
-        const updatedUser = await user.save();
-        res.json({
-            _id: updatedUser._id,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            role: updatedUser.role,
-            addresses: updatedUser.addresses,
-            wishlist: updatedUser.wishlist,
-            token: generateToken(updatedUser._id),
-        });
+      const updatedUser = await user.save();
+      res.json({
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        addresses: updatedUser.addresses,
+        wishlist: updatedUser.wishlist,
+        token: generateToken(updatedUser._id),
+      });
     } catch (error) {
-        console.error("Profile update error:", error);
-        res.status(500);
-        throw new Error('Error updating profile: ' + error.message);
+      console.error("Profile update error:", error);
+      res.status(500);
+      throw new Error('Error updating profile: ' + error.message);
     }
   } else {
     res.status(404);
@@ -141,7 +135,6 @@ router.put('/profile', protect, asyncHandler(async (req, res) => {
 router.get('/wishlist', protect, asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate('wishlist');
   if (user) {
-    // Filter out nulls in case product was deleted
     const validWishlist = user.wishlist.filter(item => item !== null);
     res.json(validWishlist);
   } else {
@@ -155,26 +148,34 @@ router.get('/wishlist', protect, asyncHandler(async (req, res) => {
 // @access  Private
 router.post('/wishlist', protect, asyncHandler(async (req, res) => {
   const { productId } = req.body;
+  
   if (!productId) {
-      res.status(400);
-      throw new Error('Product ID is required');
+    res.status(400);
+    throw new Error('Product ID is required');
   }
 
-  const user = await User.findById(req.user._id);
-  
+  // Validate ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    res.status(400);
+    throw new Error('Invalid Product ID format');
+  }
+
+  // Check if product exists
+  const product = await Product.findById(productId);
+  if (!product) {
+    res.status(404);
+    throw new Error('Product not found');
+  }
+
+  // Use $addToSet to prevent duplicates atomically
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $addToSet: { wishlist: productId } },
+    { new: true }
+  ).populate('wishlist');
+
   if (user) {
-    try {
-        if (!user.wishlist.some(id => id.toString() === productId)) {
-            user.wishlist.push(productId);
-            await user.save();
-        }
-        const populatedUser = await User.findById(req.user._id).populate('wishlist');
-        res.json(populatedUser.wishlist);
-    } catch (error) {
-        console.error("Wishlist add error:", error);
-        res.status(500);
-        throw new Error('Error adding to wishlist: ' + error.message);
-    }
+    res.json(user.wishlist);
   } else {
     res.status(404);
     throw new Error('User not found');
@@ -185,29 +186,90 @@ router.post('/wishlist', protect, asyncHandler(async (req, res) => {
 // @route   DELETE /api/auth/wishlist/:id
 // @access  Private
 router.delete('/wishlist/:id', protect, asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  
+  const productId = req.params.id;
+
+  // Validate ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    res.status(400);
+    throw new Error('Invalid Product ID format');
+  }
+
+  // Use $pull to remove atomically
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $pull: { wishlist: productId } },
+    { new: true }
+  ).populate('wishlist');
+
   if (user) {
-    user.wishlist = user.wishlist.filter(id => id.toString() !== req.params.id);
-    await user.save();
-    const populatedUser = await User.findById(req.user._id).populate('wishlist');
-    res.json(populatedUser.wishlist);
+    res.json(user.wishlist);
   } else {
     res.status(404);
     throw new Error('User not found');
   }
 }));
 
+// @desc    Toggle wishlist (add if not present, remove if present)
+// @route   PUT /api/auth/wishlist/toggle
+// @access  Private
+router.put('/wishlist/toggle', protect, asyncHandler(async (req, res) => {
+  const { productId } = req.body;
+  
+  if (!productId) {
+    res.status(400);
+    throw new Error('Product ID is required');
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    res.status(400);
+    throw new Error('Invalid Product ID format');
+  }
+
+  const user = await User.findById(req.user._id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  const isInWishlist = user.wishlist.some(id => id.toString() === productId);
+  
+  if (isInWishlist) {
+    // Remove from wishlist
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $pull: { wishlist: productId } }
+    );
+  } else {
+    // Add to wishlist
+    const product = await Product.findById(productId);
+    if (!product) {
+      res.status(404);
+      throw new Error('Product not found');
+    }
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { wishlist: productId } }
+    );
+  }
+
+  const updatedUser = await User.findById(req.user._id).populate('wishlist');
+  res.json({
+    wishlist: updatedUser.wishlist,
+    isInWishlist: !isInWishlist
+  });
+}));
+
 // @desc    Get all users
 // @route   GET /api/auth/users
 // @access  Private/Admin
 router.get('/users', protect, asyncHandler(async (req, res) => {
-    if (req.user.role !== 'admin') {
-        res.status(401);
-        throw new Error('Not authorized as an admin');
-    }
-    const users = await User.find({});
-    res.json(users);
+  if (req.user.role !== 'admin') {
+    res.status(401);
+    throw new Error('Not authorized as an admin');
+  }
+  const users = await User.find({});
+  res.json(users);
 }));
 
 module.exports = router;

@@ -12,6 +12,7 @@ import ProductDetails from './pages/ProductDetails';
 import Shop from './pages/Shop';
 import OrderSuccess from './pages/OrderSuccess';
 import { About, FAQ, Terms } from './pages/InfoPages';
+import Contact from './pages/Contact';  // ✅ ADD THIS IMPORT
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/contact" element={<Contact />} />  {/* ✅ ADD THIS ROUTE */}
           </Routes>
         </main>
         <Footer />

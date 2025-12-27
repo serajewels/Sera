@@ -6,13 +6,19 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose
+  .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log('DB Error:', err));
+  .catch((err) => console.log('DB Error:', err));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));

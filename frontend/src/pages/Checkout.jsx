@@ -13,11 +13,22 @@ const Checkout = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-        if (!userInfo) {
+        const storedUserInfo = localStorage.getItem('userInfo');
+        if (!storedUserInfo) {
           navigate('/login');
           return;
         }
+
+        let userInfo;
+        try {
+          userInfo = JSON.parse(storedUserInfo);
+        } catch (error) {
+          console.error('Failed to parse userInfo from localStorage:', error);
+          localStorage.removeItem('userInfo');
+          navigate('/login');
+          return;
+        }
+
         const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
         
         // Fetch Cart
@@ -48,7 +59,22 @@ const Checkout = () => {
     }
 
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+      const storedUserInfo = localStorage.getItem('userInfo');
+      if (!storedUserInfo) {
+        navigate('/login');
+        return;
+      }
+
+      let userInfo;
+      try {
+        userInfo = JSON.parse(storedUserInfo);
+      } catch (error) {
+        console.error('Failed to parse userInfo from localStorage:', error);
+        localStorage.removeItem('userInfo');
+        navigate('/login');
+        return;
+      }
+
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       
       const orderData = {

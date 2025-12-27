@@ -18,7 +18,13 @@ export default function Navbar() {
   useEffect(() => {
     const stored = localStorage.getItem('userInfo');
     if (stored) {
-      setUserInfo(JSON.parse(stored));
+      try {
+        setUserInfo(JSON.parse(stored));
+      } catch (error) {
+        console.error('Failed to parse userInfo from localStorage:', error);
+        localStorage.removeItem('userInfo');
+        setUserInfo(null);
+      }
     }
   }, [location]); // Re-check on route change (e.g. after login redirect)
 
