@@ -17,8 +17,12 @@ const userSchema = new mongoose.Schema({
   },
   phone: { 
     type: String, 
-    unique: true,
-    sparse: true
+    required: true,
+    unique: true
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: true  // Always true since user is created only after OTP verification
   },
   role: { type: String, default: 'user', enum: ['user', 'admin'] },
   wishlist: [{
@@ -46,19 +50,25 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Only hash if password is being modified (for profile updates)
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) {
     return;
   }
+  
+  // Check if already hashed (password from TempUser is already hashed)
+  if (this.password.startsWith('$2')) {
+    return;
+  }
+  
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// **PERFORMANCE INDEXES**
-userSchema.index({ email: 1 });                    // Login (ALREADY from unique)
-userSchema.index({ phone: 1 });                    // Phone lookup
-userSchema.index({ role: 1 });                     // Admin queries
-userSchema.index({ 'wishlist': 1 });               // Wishlist operations
-userSchema.index({ isActive: 1, createdAt: -1 });  // Active users list
+userSchema.index({ email: 1 });
+userSchema.index({ phone: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ 'wishlist': 1 });
+userSchema.index({ isActive: 1, createdAt: -1 });
 
 module.exports = mongoose.model('User', userSchema);
