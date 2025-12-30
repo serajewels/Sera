@@ -72,19 +72,19 @@ const CategoriesSection = () => {
   const categories = [
     { 
       name: 'EARRINGS', 
-      img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/earring.jpg',
     },
     { 
       name: 'BRACELET', 
-      img: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/bracelet.png',
     },
     { 
       name: 'RINGS', 
-      img: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/ring.png',
     },
     { 
       name: 'NECKLACE', 
-      img: 'https://images.unsplash.com/photo-1599643478518-17488fbbcd75?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/necklace.jpg',
     },
   ];
 
@@ -165,9 +165,11 @@ const GiftingSection = () => {
   
   const giftImages = [
     'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=1000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?q=80&w=1000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=1000&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=1000&auto=format&fit=crop',
+    '/images/gift1.jpg',
+    '/images/gift2.jpg',
+    '/images/gift3.jpg',
+    '/images/gift4.jpg',
+    '/images/gift5.jpg'
   ];
 
   useEffect(() => {
@@ -256,36 +258,36 @@ const BentoCollectionsSection = () => {
     {
       name: 'Our Bestsellers',
       description: 'Customer favorites that never go out of style',
-      img: 'https://images.unsplash.com/photo-1630019852942-f89202989a51?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/bestsellers.jpg',
       size: 'large',
       color: 'from-rose-100 to-pink-50'
     },
     {
       name: 'Everyday Essentials',
       description: 'Chic daily pieces',
-      img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?q=80&w=1000&auto=format&fit=crop',
-      size: 'medium',
+      img: '/images/everyday.jpg',
+      size: 'tall',
       color: 'from-pink-50 to-rose-50'
     },
     {
-      name: 'Statement Pieces',
+      name: 'Accent Pairs',
       description: 'Bold & beautiful',
-      img: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/pair.jpg',
       size: 'small',
       color: 'from-rose-50 to-white'
     },
     {
       name: 'Minimalist',
       description: 'Less is more',
-      img: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=1000&auto=format&fit=crop',
+      img: '/images/minimalist.jpg',
       size: 'small',
       color: 'from-white to-rose-50'
     },
     {
       name: 'Boho Vibes',
       description: 'Free-spirited designs',
-      img: 'https://images.unsplash.com/photo-1599643478518-17488fbbcd75?q=80&w=1000&auto=format&fit=crop',
-      size: 'wide',
+      img: '/images/boho.png',
+      size: 'wider',
       color: 'from-rose-50 to-pink-100'
     },
   ];
@@ -298,10 +300,15 @@ const BentoCollectionsSection = () => {
         return 'col-span-2 row-span-1 md:col-span-1 md:row-span-2';
       case 'wide':
         return 'col-span-2 row-span-1 md:col-span-2 md:row-span-1';
+      case 'tall':
+        return 'col-span-2 row-span-2 md:col-span-1 md:row-span-3';
+      case 'wider':
+        return 'col-span-2 row-span-1 md:col-span-3 md:row-span-1';
       default:
         return 'col-span-1 row-span-1';
     }
-  };
+};
+
 
   return (
     <section className="py-16 md:py-24 px-4 md:px-6 bg-gradient-to-b from-rose-50 via-white to-pink-50">
@@ -378,12 +385,12 @@ const BentoCollectionsSection = () => {
 
 const FloatingGallerySection = () => {
   const galleryItems = [
-    { img: 'https://images.unsplash.com/photo-1630019852942-f89202989a51?q=80&w=1000&auto=format&fit=crop', height: 'h-64', delay: 0 },
-    { img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?q=80&w=1000&auto=format&fit=crop', height: 'h-80', delay: 0.1 },
-    { img: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=1000&auto=format&fit=crop', height: 'h-72', delay: 0.2 },
-    { img: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=1000&auto=format&fit=crop', height: 'h-96', delay: 0.3 },
-    { img: 'https://images.unsplash.com/photo-1599643477877-530eb83abc8e?q=80&w=1000&auto=format&fit=crop', height: 'h-64', delay: 0.4 },
-    { img: 'https://images.unsplash.com/photo-1599643478518-17488fbbcd75?q=80&w=1000&auto=format&fit=crop', height: 'h-88', delay: 0.5 },
+    { img: '/images/gallery2.png', height: 'h-64', delay: 0 },
+    { img: '/images/gallery1.png', height: 'h-80', delay: 0.1 },
+    { img: '/images/gallery3.jpg', height: 'h-72', delay: 0.2 },
+    { img: '/images/gallery4.jpg', height: 'h-96', delay: 0.3 },
+    { img: '/images/gallery5.jpg', height: 'h-64', delay: 0.4 },
+    { img: '/images/gallery6.jpg', height: 'h-88', delay: 0.5 },
   ];
 
   return (
