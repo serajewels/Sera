@@ -43,6 +43,10 @@ app.use('/api/cart', require('./routes/cartRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/contact', require('./routes/contactRoutes'));
+app.use('/api/upload', require('./routes/uploadRoutes'));
+
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

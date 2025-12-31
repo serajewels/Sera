@@ -260,35 +260,40 @@ const BentoCollectionsSection = () => {
       description: 'Customer favorites that never go out of style',
       img: '/images/bestsellers.jpg',
       size: 'large',
-      color: 'from-rose-100 to-pink-50'
+      color: 'from-rose-100 to-pink-50',
+      link: '/shop?tags=bestseller'
     },
     {
       name: 'Everyday Essentials',
       description: 'Chic daily pieces',
       img: '/images/everyday.jpg',
       size: 'tall',
-      color: 'from-pink-50 to-rose-50'
+      color: 'from-pink-50 to-rose-50',
+      link: '/shop?tags=everyday'
     },
     {
       name: 'Accent Pairs',
       description: 'Bold & beautiful',
       img: '/images/pair.jpg',
       size: 'small',
-      color: 'from-rose-50 to-white'
+      color: 'from-rose-50 to-white',
+      link: '/shop?tags=accent'
     },
     {
       name: 'Minimalist',
       description: 'Less is more',
       img: '/images/minimalist.jpg',
       size: 'small',
-      color: 'from-white to-rose-50'
+      color: 'from-white to-rose-50',
+      link: '/shop?tags=minimalist'
     },
     {
       name: 'Boho Vibes',
       description: 'Free-spirited designs',
       img: '/images/boho.png',
       size: 'wider',
-      color: 'from-rose-50 to-pink-100'
+      color: 'from-rose-50 to-pink-100',
+      link: '/shop?tags=boho'
     },
   ];
 
@@ -327,15 +332,19 @@ const BentoCollectionsSection = () => {
       
       <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-3 auto-rows-[180px] md:auto-rows-[240px] gap-3 md:gap-4">
         {collections.map((collection, index) => (
-          <motion.div
+          <Link
+            to={collection.link}
             key={collection.name}
+            className={`${getSizeClasses(collection.size)} group relative overflow-hidden rounded-3xl cursor-pointer block`}
+          >
+          <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             whileInView={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: index * 0.1 }}
             viewport={{ once: true }}
             onHoverStart={() => setHoveredIndex(index)}
             onHoverEnd={() => setHoveredIndex(null)}
-            className={`${getSizeClasses(collection.size)} group relative overflow-hidden rounded-3xl cursor-pointer`}
+            className="w-full h-full relative"
           >
             <div className="absolute inset-0">
               <img 
@@ -377,6 +386,7 @@ const BentoCollectionsSection = () => {
 
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-bl-full blur-2xl" />
           </motion.div>
+          </Link>
         ))}
       </div>
     </section>

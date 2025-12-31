@@ -33,6 +33,11 @@ const productSchema = new mongoose.Schema({
     min: 0,
     default: 0
   },
+  sales: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   rating: { 
     type: Number, 
     default: 0,
@@ -65,14 +70,24 @@ const productSchema = new mongoose.Schema({
     type: String,
     unique: true,
     sparse: true
-  }
+  },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true
+  }],
+  accentPairs: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product'
+  }]
 }, { 
   timestamps: true 
 });
 
 // **IMPORTANT INDEXES**
 productSchema.index({ category: 1 });
-productSchema.index({ name: 'text', description: 'text' });
+productSchema.index({ tags: 1 });
+productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 productSchema.index({ 'reviews': 1, 'numReviews': -1 });
 productSchema.index({ rating: -1, numReviews: -1 });
 productSchema.index({ featured: 1, createdAt: -1 });

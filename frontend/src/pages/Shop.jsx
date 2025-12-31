@@ -2,20 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaFilter, FaSearch, FaShoppingCart, FaHeart, FaTimes } from 'react-icons/fa';
+import { FaFilter, FaSearch, FaShoppingCart, FaHeart, FaTimes, FaCheck } from 'react-icons/fa';
+
 
 const Shop = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedTags, setSelectedTags] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [priceRange, setPriceRange] = useState(10000);
-  const [showFilters, setShowFilters] = useState(false); // ✅ Mobile filter toggle
+  const [showInStock, setShowInStock] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
+
   const categories = ['All', 'Necklace', 'Earrings', 'Bracelet', 'Rings'];
+
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -33,25 +38,40 @@ const Shop = () => {
     }
   }, []);
 
+
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const categoryParam = params.get('category');
+    const tagsParam = params.get('tags');
+
+
     if (categoryParam) {
       const formattedCategory = categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1).toLowerCase();
       setSelectedCategory(formattedCategory);
     } else {
       setSelectedCategory('All');
     }
+
+
+    if (tagsParam) {
+      setSelectedTags(tagsParam.split(',').map(t => t.trim()));
+    } else {
+      setSelectedTags([]);
+    }
   }, [location]);
+
 
   useEffect(() => {
     const safeProducts = Array.isArray(products) ? products : [];
     let result = safeProducts;
 
+
+    // Filter by Category
     if (selectedCategory !== 'All') {
       result = result.filter(p => 
         p.category && 
@@ -59,6 +79,58 @@ const Shop = () => {
       );
     }
 
+
+    // Filter by Stock Status - FIXED: Only filter when showInStock is true
+    if (showInStock) {
+      result = result.filter(p => p.stock > 0);
+    }
+    // When showInStock is false, show ALL products regardless of stock
+
+
+    // Filter by Tags
+    if (selectedTags.length > 0) {
+      const hasBestseller = selectedTags.includes('bestseller');
+      
+      if (hasBestseller) {
+        const otherTags = selectedTags.filter(t => t !== 'bestseller');
+        
+        if (otherTags.length > 0) {
+          result = result.filter(p => 
+            p.tags && otherTags.every(t => p.tags.includes(t))
+          );
+        }
+        
+        if (selectedCategory === 'All') {
+          const grouped = {};
+          result.forEach(p => {
+             const cat = p.category || 'Uncategorized';
+             if (!grouped[cat]) grouped[cat] = [];
+             grouped[cat].push(p);
+          });
+          
+          const bestsellers = [];
+          Object.keys(grouped).forEach(cat => {
+            const sorted = grouped[cat].sort((a, b) => {
+              const salesA = a.sales || 0;
+              const salesB = b.sales || 0;
+              if (salesB !== salesA) return salesB - salesA;
+              return new Date(b.createdAt) - new Date(a.createdAt);
+            });
+            bestsellers.push(...sorted.slice(0, 3));
+          });
+          result = bestsellers;
+        } else {
+           result.sort((a, b) => (b.sales || 0) - (a.sales || 0));
+        }
+      } else {
+        result = result.filter(p => 
+          p.tags && selectedTags.every(t => p.tags.includes(t))
+        );
+      }
+    }
+
+
+    // Filter by Search Query
     if (searchQuery.trim()) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(p => 
@@ -66,22 +138,27 @@ const Shop = () => {
       );
     }
 
+
+    // Filter by Price Range
     result = result.filter(p => 
       p.price && typeof p.price === 'number' && p.price <= priceRange
     );
 
+
     setFilteredProducts(result);
-  }, [products, selectedCategory, searchQuery, priceRange]);
+  }, [products, selectedCategory, searchQuery, priceRange, selectedTags, showInStock]);
+
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
-    setShowFilters(false); // ✅ Close mobile menu after selection
+    setShowFilters(false);
     if (category === 'All') {
       navigate('/shop');
     } else {
       navigate(`/shop?category=${category.toLowerCase()}`);
     }
   };
+
 
   const addToCart = async (e, productId) => {
     e.preventDefault();
@@ -93,6 +170,7 @@ const Shop = () => {
       return;
     }
 
+
     try {
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       await axios.post('http://localhost:5000/api/cart', { productId, quantity: 1 }, config);
@@ -102,6 +180,7 @@ const Shop = () => {
       alert('Failed to add to cart');
     }
   };
+
 
   const renderProducts = () => {
     if (loading) {
@@ -122,6 +201,7 @@ const Shop = () => {
         </div>
       );
     }
+
 
     if (filteredProducts.length === 0) {
       return (
@@ -153,6 +233,7 @@ const Shop = () => {
       );
     }
 
+
     return filteredProducts.map(product => (
       <Link 
         to={`/product/${product._id}`} 
@@ -165,19 +246,27 @@ const Shop = () => {
         >
           <div className="relative aspect-square overflow-hidden bg-gray-100">
             <img 
-              src={product.images?.[0] || 'https://via.placeholder.com/300?text=No+Image'} 
+              src={product.images?.[0] || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E'} 
               alt={product.name || 'Product'}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => {
-                e.target.src = 'https://via.placeholder.com/300?text=No+Image';
+                e.target.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E';
               }}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+            
+            {/* Stock Badge */}
+            {product.stock === 0 && (
+              <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                Out of Stock
+              </div>
+            )}
             
             <button 
               onClick={(e) => addToCart(e, product._id)}
               className="absolute bottom-3 right-3 md:bottom-4 md:right-4 bg-white text-gray-900 p-2 md:p-3 rounded-full shadow-lg opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-rose-500 hover:text-white hover:shadow-xl"
               title="Add to Cart"
+              disabled={product.stock === 0}
             >
               <FaShoppingCart className="w-3 h-3 md:w-4 md:h-4" />
             </button>
@@ -190,14 +279,22 @@ const Shop = () => {
             <p className="text-gray-500 text-xs md:text-sm mb-2 capitalize truncate">
               {product.category || 'Uncategorized'}
             </p>
-            <p className="text-lg md:text-xl font-medium text-gray-900">
-              Rs. {product.price?.toLocaleString() || 0}
-            </p>
+            <div className="flex items-center justify-center gap-2">
+              <p className="text-lg md:text-xl font-medium text-gray-900">
+                Rs. {product.price?.toLocaleString() || 0}
+              </p>
+              {product.stock > 0 && product.stock <= 5 && (
+                <span className="text-xs text-orange-500 font-medium">
+                  Only {product.stock} left
+                </span>
+              )}
+            </div>
           </div>
         </motion.div>
       </Link>
     ));
   };
+
 
   return (
     <div className="min-h-screen bg-white pt-16 md:pt-20">
@@ -210,10 +307,16 @@ const Shop = () => {
         >
           {selectedCategory === 'All' ? 'Our Collection' : `${selectedCategory} Collection`}
         </motion.h1>
+        {selectedTags.length > 0 && (
+          <p className="text-rose-500 font-medium mb-2 uppercase tracking-wide text-sm">
+            Filtered by: {selectedTags.join(', ')}
+          </p>
+        )}
         <p className="text-sm md:text-base text-gray-600 max-w-2xl mx-auto px-4">
           Discover our handcrafted jewelry designed to elevate your everyday style.
         </p>
       </div>
+
 
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-12">
         {/* Mobile Filter Button */}
@@ -224,8 +327,9 @@ const Shop = () => {
           {showFilters ? <FaTimes className="w-5 h-5" /> : <FaFilter className="w-5 h-5" />}
         </button>
 
+
         <div className="flex flex-col lg:flex-row gap-6 md:gap-12">
-          {/* Sidebar / Filters - Mobile Overlay */}
+          {/* Sidebar / Filters */}
           <AnimatePresence>
             {(showFilters || window.innerWidth >= 1024) && (
               <motion.div 
@@ -250,6 +354,8 @@ const Shop = () => {
                   <FaTimes className="w-6 h-6" />
                 </button>
 
+
+                {/* Categories */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border mt-12 lg:mt-0">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
                     <FaFilter className="text-rose-500" /> Categories
@@ -272,6 +378,30 @@ const Shop = () => {
                   </ul>
                 </div>
 
+
+                {/* Stock Filter */}
+                <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
+                  <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
+                    <FaCheck className="text-rose-500" /> Availability
+                  </h3>
+                  <label className="flex items-center gap-3 cursor-pointer group select-none">
+                    <div className="relative">
+                      <input 
+                        type="checkbox" 
+                        checked={showInStock}
+                        onChange={(e) => setShowInStock(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+                    </div>
+                    <span className="text-gray-700 font-medium group-hover:text-rose-600 transition-colors">
+                      In Stock Only
+                    </span>
+                  </label>
+                </div>
+
+
+                {/* Search */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
                     <FaSearch className="text-rose-500" /> Search
@@ -288,6 +418,7 @@ const Shop = () => {
             )}
           </AnimatePresence>
 
+
           {/* Overlay for mobile */}
           {showFilters && (
             <div 
@@ -295,6 +426,7 @@ const Shop = () => {
               onClick={() => setShowFilters(false)}
             />
           )}
+
 
           {/* Product Grid */}
           <motion.div 
@@ -308,6 +440,7 @@ const Shop = () => {
               </div>
             </div>
 
+
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {renderProducts()}
             </div>
@@ -317,5 +450,6 @@ const Shop = () => {
     </div>
   );
 };
+
 
 export default Shop;

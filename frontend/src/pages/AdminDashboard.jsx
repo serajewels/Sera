@@ -24,7 +24,39 @@ const AdminDashboard = () => {
     stock: '',
     description: '',
     images: '',
+    selectedStyles: [], // Array for multiple styles
+    accentPairs: '',
   });
+
+  // Helper to convert Google Drive links to direct image links
+  const convertDriveLink = (link) => {
+    try {
+      if (link.includes('drive.google.com')) {
+        // Extract ID
+        let id = '';
+        const parts = link.split('/');
+        if (link.includes('/file/d/')) {
+          const index = parts.indexOf('d');
+          if (index !== -1 && parts[index + 1]) {
+            id = parts[index + 1];
+          }
+        } else if (link.includes('id=')) {
+          const params = new URLSearchParams(link.split('?')[1]);
+          id = params.get('id');
+        }
+
+        if (id) {
+          // Clean ID
+          id = id.split('?')[0].split('&')[0];
+          // Use the 'uc' export link which is standard for direct viewing
+          return `https://drive.google.com/uc?export=view&id=${id}`;
+        }
+      }
+      return link;
+    } catch (e) {
+      return link;
+    }
+  };
 
   // Filter States - Split search into two states
   const [searchInput, setSearchInput] = useState(''); // For input field
@@ -277,17 +309,46 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleOpenModal = (product = null) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleOpenModal = async (product = null) => {
     if (product) {
-      setEditingProduct(product);
-      setFormData({
-        name: product.name || '',
-        price: product.price || '',
-        category: product.category || 'NECKLACE',
-        stock: product.stock || '',
-        description: product.description || '',
-        images: product.images ? product.images.join(', ') : '',
-      });
+      // Fetch full details to get populated accentPairs (names)
+      try {
+        const { data } = await axios.get(`http://localhost:5000/api/products/${product._id}`);
+        setEditingProduct(data);
+        
+        // Determine styles from tags
+        const currentTags = data.tags || [];
+        const validStyles = ['minimalist', 'boho', 'everyday', 'accent'];
+        const foundStyles = currentTags.filter(t => validStyles.includes(t));
+
+        setFormData({
+          name: data.name || '',
+          price: data.price || '',
+          category: data.category || 'NECKLACE',
+          stock: data.stock || '',
+          description: data.description || '',
+          images: data.images ? data.images.join(', ') : '',
+          selectedStyles: foundStyles,
+          // Map accentPairs to names if populated, otherwise IDs
+          accentPairs: data.accentPairs ? data.accentPairs.map(p => (typeof p === 'object' ? p.name : p)).join(', ') : '',
+        });
+      } catch (error) {
+        console.error("Failed to fetch product details", error);
+        // Fallback to list data
+        setEditingProduct(product);
+        setFormData({
+            name: product.name || '',
+            price: product.price || '',
+            category: product.category || 'NECKLACE',
+            stock: product.stock || '',
+            description: product.description || '',
+            images: product.images ? product.images.join(', ') : '',
+            selectedStyles: [], // basic fallback
+            accentPairs: product.accentPairs ? product.accentPairs.join(', ') : '',
+        });
+      }
     } else {
       setEditingProduct(null);
       setFormData({
@@ -297,9 +358,42 @@ const AdminDashboard = () => {
         stock: '',
         description: '',
         images: '',
+        selectedStyles: [],
+        accentPairs: '',
       });
     }
     setIsModalOpen(true);
+  };
+
+  const uploadFileHandler = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('image', file);
+    setUploading(true);
+
+    try {
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+
+      const { data } = await axios.post('http://localhost:5000/api/upload', formDataUpload, config);
+      
+      // Append the new image URL to the existing images string
+      const fullUrl = `http://localhost:5000${data}`; // Ensure full path if relative
+      setFormData(prev => ({
+        ...prev,
+        images: prev.images ? `${prev.images}, ${fullUrl}` : fullUrl
+      }));
+      setUploading(false);
+    } catch (error) {
+      console.error(error);
+      setUploading(false);
+      alert('Image upload failed');
+    }
   };
 
   const handleDelete = async (id) => {
@@ -327,14 +421,21 @@ const AdminDashboard = () => {
     }
     const config = { headers: { Authorization: `Bearer ${ui.token}` } };
 
+    // Construct tags from selected styles
+    const tags = [...formData.selectedStyles];
+
     const productData = {
-      ...formData,
+      name: formData.name,
       price: parseFloat(formData.price),
+      category: formData.category,
       stock: parseInt(formData.stock),
+      description: formData.description,
       images: formData.images
         .split(',')
-        .map((img) => img.trim())
+        .map((img) => convertDriveLink(img.trim())) // Convert Drive links
         .filter((img) => img !== ''),
+      tags: tags,
+      accentPairs: formData.accentPairs ? formData.accentPairs.split(',').map(id => id.trim()).filter(id => id) : [],
     };
 
     try {
@@ -680,6 +781,7 @@ const AdminDashboard = () => {
               <th className="px-6 py-3 font-medium text-gray-500">Name</th>
               <th className="px-6 py-3 font-medium text-gray-500">Email</th>
               <th className="px-6 py-3 font-medium text-gray-500">Role</th>
+              <th className="px-6 py-3 font-medium text-gray-500">Phone</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -688,6 +790,7 @@ const AdminDashboard = () => {
                 <td className="px-6 py-4">{user.name || 'N/A'}</td>
                 <td className="px-6 py-4">{user.email || 'N/A'}</td>
                 <td className="px-6 py-4">{user.role || 'user'}</td>
+                <td className="px-6 py-4">{user.phone || 'N/A'}</td>
               </tr>
             ))}
           </tbody>
@@ -829,105 +932,130 @@ const AdminDashboard = () => {
       );
     }
     return (
-      <div className="bg-white shadow rounded-lg overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 font-medium text-gray-500">Order ID</th>
-              <th className="px-6 py-3 font-medium text-gray-500">User</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Date</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Total</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Status</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredOrders.map((order) => (
-              <tr key={order._id || Math.random()}>
-                <td className="px-6 py-4 font-mono text-sm">
-                  {order._id?.substring(0, 8) || 'N/A'}...
-                </td>
-                <td className="px-6 py-4">{order.user?.name || 'Unknown'}</td>
-                <td className="px-6 py-4">
-                  {order.createdAt
-                    ? new Date(order.createdAt).toLocaleDateString()
-                    : 'N/A'}
-                </td>
-                <td className="px-6 py-4">Rs. {order.totalPrice || 0}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      order.status === 'delivered'
-                        ? 'bg-green-100 text-green-700'
-                        : order.status === 'shipped'
-                        ? 'bg-blue-100 text-blue-700'
-                        : order.status === 'processing'
-                        ? 'bg-purple-100 text-purple-700'
-                        : order.status === 'cancelled'
-                        ? 'bg-red-100 text-red-700'
-                        : order.status === 'exchange_requested'
-                        ? 'bg-orange-100 text-orange-700'
-                        : order.status === 'exchange_approved'
-                        ? 'bg-teal-100 text-teal-700'
-                        : order.status === 'exchanged'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}
-                  >
-                    {order.status
-                      ? order.status
-                          .replace('_', ' ')
-                          .split(' ')
-                          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                          .join(' ')
-                      : 'Unknown'}
-                  </span>
-                  {order.exchangeReason && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Reason: {order.exchangeReason.replace('_', ' ')}
-                    </p>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {order.status === 'exchange_requested' ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleExchangeApproval(order._id, true)}
-                        className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors flex items-center gap-1"
-                      >
-                        <FaCheck /> Approve
-                      </button>
-                      <button
-                        onClick={() => handleExchangeApproval(order._id, false)}
-                        className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                      >
-                        <FaTimes /> Reject
-                      </button>
+  <div className="bg-white shadow rounded-lg overflow-x-auto">
+    <table className="w-full text-left">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 font-medium text-gray-500">Order ID</th>
+          <th className="px-6 py-3 font-medium text-gray-500">User</th>
+          <th className="px-6 py-3 font-medium text-gray-500">Products</th>
+         
+          <th className="px-6 py-3 font-medium text-gray-500">Date</th>
+          <th className="px-6 py-3 font-medium text-gray-500">Total</th>
+          <th className="px-6 py-3 font-medium text-gray-500">Status</th>
+          <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200">
+        {filteredOrders.map((order) => (
+          <tr key={order._id || Math.random()}>
+            <td className="px-6 py-4 font-mono text-sm">
+              {order._id?.substring(0, 8) || 'N/A'}...
+            </td>
+            <td className="px-6 py-4">{order.user?.name || 'Unknown'}</td>
+            
+            {/* Products Column */}
+            <td className="px-6 py-4">
+              <div className="text-sm space-y-1">
+                {order.items && order.items.length > 0 ? (
+                  order.items.map((item, idx) => (
+                    <div key={idx} className="text-gray-700">
+                      <span className="font-medium">
+                        {item.name || item.product?.name || 'Product'}
+                      </span>
+                      <span className="text-gray-500"> × {item.quantity}</span>
                     </div>
-                  ) : order.status === 'cancelled' ||
-                    order.status === 'exchanged' ? (
-                    <span className="text-gray-400 text-xs">No actions</span>
-                  ) : (
-                    <select
-                      value={order.status || 'pending'}
-                      onChange={(e) =>
-                        handleOrderStatus(order._id, e.target.value)
-                      }
-                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-rose-500 focus:border-rose-500"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="processing">Processing</option>
-                      <option value="shipped">Shipped</option>
-                      <option value="delivered">Delivered</option>
-                    </select>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
+                  ))
+                ) : (
+                  <span className="text-gray-400">No items</span>
+                )}
+              </div>
+            </td>
+
+            
+
+            <td className="px-6 py-4">
+              {order.createdAt
+                ? new Date(order.createdAt).toLocaleDateString()
+                : 'N/A'}
+            </td>
+            <td className="px-6 py-4">Rs. {order.totalPrice || 0}</td>
+            <td className="px-6 py-4">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  order.status === 'delivered'
+                    ? 'bg-green-100 text-green-700'
+                    : order.status === 'shipped'
+                    ? 'bg-blue-100 text-blue-700'
+                    : order.status === 'processing'
+                    ? 'bg-purple-100 text-purple-700'
+                    : order.status === 'cancelled'
+                    ? 'bg-red-100 text-red-700'
+                    : order.status === 'exchange_requested'
+                    ? 'bg-orange-100 text-orange-700'
+                    : order.status === 'exchange_approved'
+                    ? 'bg-teal-100 text-teal-700'
+                    : order.status === 'exchanged'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                }`}
+              >
+                {order.status
+                  ? order.status
+                      .replace('_', ' ')
+                      .split(' ')
+                      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                      .join(' ')
+                  : 'Unknown'}
+              </span>
+              {order.exchangeReason && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Reason: {order.exchangeReason.replace('_', ' ')}
+                </p>
+              )}
+            </td>
+            <td className="px-6 py-4">
+              {order.status === 'exchange_requested' ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExchangeApproval(order._id, true)}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors flex items-center gap-1"
+                  >
+                    <FaCheck /> Approve
+                  </button>
+                  <button
+                    onClick={() => handleExchangeApproval(order._id, false)}
+                    className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
+                  >
+                    <FaTimes /> Reject
+                  </button>
+                </div>
+              ) : order.status === 'cancelled' ||
+                order.status === 'exchanged' ? (
+                <span className="text-gray-400 text-xs">No actions</span>
+              ) : (
+                <select
+                  value={order.status || 'pending'}
+                  onChange={(e) =>
+                    handleOrderStatus(order._id, e.target.value)
+                  }
+                  className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-rose-500 focus:border-rose-500"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="shipped">Shipped</option>
+                  <option value="delivered">Delivered</option>
+                </select>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+
   };
 
   return (
@@ -1063,38 +1191,123 @@ const AdminDashboard = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Image URLs (comma separated)
+                </label>
+                <div className="flex gap-2 mb-2">
+                   <input
+                     type="file"
+                     onChange={uploadFileHandler}
+                     className="block w-full text-sm text-gray-500
+                       file:mr-4 file:py-2 file:px-4
+                       file:rounded-full file:border-0
+                       file:text-sm file:font-semibold
+                       file:bg-rose-50 file:text-rose-700
+                       hover:file:bg-rose-100"
+                   />
+                   {uploading && <span className="text-sm text-gray-500 self-center">Uploading...</span>}
+                </div>
+                
+                {/* Image Preview */}
+                {formData.images && (
+                  <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
+                    {formData.images.split(',').map((img, index) => {
+                      const trimmedImg = img.trim();
+                      if (!trimmedImg) return null;
+                      const displayUrl = convertDriveLink(trimmedImg);
+                      return (
+                        <div key={index} className="relative w-24 h-24 flex-shrink-0 border rounded-lg overflow-hidden bg-gray-100">
+                          <img 
+                            src={displayUrl} 
+                            alt={`Preview ${index}`} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <textarea
+                  value={formData.images}
+                  onChange={(e) => setFormData({ ...formData, images: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-rose-500 focus:border-rose-500"
+                  rows="3"
+                  placeholder="https://example.com/image1.jpg, https://drive.google.com/..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload an image above or paste links. Google Drive links will be automatically converted.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Style Collections (Select multiple)
+                </label>
+                <div className="grid grid-cols-2 gap-4 mb-4 p-4 border rounded-lg bg-gray-50">
+                  {['minimalist', 'boho', 'everyday', 'accent'].map((style) => (
+                    <label key={style} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedStyles.includes(style)}
+                        onChange={(e) => {
+                          const newStyles = e.target.checked
+                            ? [...formData.selectedStyles, style]
+                            : formData.selectedStyles.filter((s) => s !== style);
+                          setFormData({ ...formData, selectedStyles: newStyles });
+                        }}
+                        className="w-4 h-4 text-rose-500 rounded focus:ring-rose-500"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">
+                        {style === 'boho' ? 'Boho Vibes' : 
+                         style === 'everyday' ? 'Everyday Essentials' : 
+                         style === 'accent' ? 'Accent Pairs' : style}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Paired Products (Product Names or IDs, comma separated)
                 </label>
                 <input
                   type="text"
-                  value={formData.images}
-                  onChange={(e) =>
-                    setFormData({ ...formData, images: e.target.value })
-                  }
-                  className="w-full border p-2 rounded"
-                  placeholder="http://example.com/img1.jpg, http://example.com/img2.jpg"
+                  value={formData.accentPairs}
+                  onChange={(e) => setFormData({ ...formData, accentPairs: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-rose-500 focus:border-rose-500"
+                  placeholder="Golden Hoop, Silver Ring..."
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Description
                 </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  className="w-full border p-2 rounded"
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-rose-500 focus:border-rose-500"
                   rows="3"
                 />
               </div>
-              <button
-                type="submit"
-                className="w-full bg-rose-500 text-white py-2 rounded hover:bg-rose-600 transition-colors"
-              >
-                {editingProduct ? 'Update Product' : 'Create Product'}
-              </button>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 transition-colors"
+                >
+                  {editingProduct ? 'Update Product' : 'Create Product'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

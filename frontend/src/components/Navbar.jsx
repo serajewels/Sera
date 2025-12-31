@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
-import { FaBars, FaSearch, FaUser, FaShoppingCart, FaHeart } from 'react-icons/fa';
-import { Link, useLocation } from 'react-router-dom';
+import { FaBars, FaSearch, FaUser, FaShoppingCart, FaHeart, FaArrowLeft } from 'react-icons/fa';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import TopBanner from './TopBanner';
 import NavOverlay from './NavOverlay';
 import SearchOverlay from './SearchOverlay';
+
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -12,8 +13,10 @@ export default function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { scrollY } = useScroll();
   const location = useLocation();
+  const navigate = useNavigate();
   const isHome = location.pathname === '/';
   const [userInfo, setUserInfo] = useState(null);
+
 
   useEffect(() => {
     const stored = localStorage.getItem('userInfo');
@@ -28,11 +31,13 @@ export default function Navbar() {
     }
   }, [location]); // Re-check on route change (e.g. after login redirect)
 
+
   useMotionValueEvent(scrollY, "change", (latest) => {
     if (isHome) {
       setIsScrolled(latest > 36);
     }
   });
+
 
   // Force white navbar on non-home pages
   useEffect(() => {
@@ -43,17 +48,13 @@ export default function Navbar() {
     }
   }, [isHome, scrollY]);
 
+
   const navbarClass = isHome
     ? (isScrolled 
         ? 'fixed top-0 left-0 right-0 bg-white shadow-sm text-gray-900' 
         : 'absolute top-[36px] left-0 right-0 bg-transparent text-white')
-    : 'sticky top-0 left-0 right-0 bg-white shadow-sm text-gray-900'; 
-    // On non-home pages, we can use sticky or fixed. 
-    // If sticky, it takes space. But TopBanner is relative.
-    // If TopBanner is present on all pages, sticky works well.
-    // But sticky top-0 means it sticks under TopBanner?
-    // If TopBanner scrolls, sticky navbar follows until top-0.
-    // So 'sticky top-0' is good for non-home.
+    : 'sticky top-0 left-0 right-0 bg-white shadow-sm text-gray-900';
+
 
   return (
     <>
@@ -65,15 +66,35 @@ export default function Navbar() {
         className={`z-50 transition-colors duration-300 ${navbarClass}`}
       >
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          {/* Left: Hamburger */}
-          <button onClick={() => setIsNavOpen(true)} className="text-2xl focus:outline-none">
-            <FaBars />
-          </button>
+          {/* Left: Hamburger + Back Button */}
+          <div className="flex items-center space-x-4">
+            <button onClick={() => setIsNavOpen(true)} className="text-2xl focus:outline-none">
+              <FaBars />
+            </button>
+            
+            {/* Back Button - Desktop Only */}
+            {!isHome && (
+              <motion.button
+                onClick={() => navigate(-1)}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="hidden md:flex items-center space-x-2 text-sm font-semibold uppercase tracking-wider hover:text-rose-500 transition-colors"
+              >
+                <FaArrowLeft className="text-lg" />
+                <span>Back</span>
+              </motion.button>
+            )}
+          </div>
+
 
           {/* Center: Logo */}
           <Link to="/" className="text-3xl font-serif font-bold tracking-widest uppercase">
             SERA
           </Link>
+
 
           {/* Right: Icons */}
           <div className="flex items-center space-x-6 text-xl">
@@ -94,6 +115,7 @@ export default function Navbar() {
           </div>
         </div>
       </motion.header>
+
 
       <NavOverlay isOpen={isNavOpen} onClose={() => setIsNavOpen(false)} />
       <SearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { motion } from 'framer-motion';
 import { FaStar, FaHeart, FaMinus, FaPlus, FaShoppingCart } from 'react-icons/fa';
 
-const FALLBACK_IMAGE = 'https://picsum.photos/500/500?grayscale';
+const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='500' viewBox='0 0 500 500'%3E%3Crect fill='%23f3f4f6' width='500' height='500'/%3E%3Ctext fill='%239ca3af' font-family='sans-serif' font-size='32' dy='10.5' font-weight='bold' x='50%25' y='50%25' text-anchor='middle'%3ENo Image%3C/text%3E%3C/svg%3E";
 
 const ProductDetails = () => {
   const { id } = useParams();
@@ -130,26 +130,39 @@ const ProductDetails = () => {
     }
   };
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (productToAdd = null) => {
+    // If productToAdd is an event (synthetic event), treat it as null
+    if (productToAdd && productToAdd.preventDefault) {
+      productToAdd = null;
+    }
+
     const ui = getUserInfo();
+    const itemToAdd = productToAdd || product; // Default to current product if no arg passed
+
     if (!ui) {
-      navigate(`/login?redirect=/product/${id}`);
+      navigate(`/login?redirect=/product/${itemToAdd._id}`);
       return;
     }
 
-    setAddingToCart(true);
+    // If adding the main product, show spinner on main button
+    if (!productToAdd) {
+      setAddingToCart(true);
+    }
+    
     try {
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
       await axios.post(
         'http://localhost:5000/api/cart',
-        { productId: id, quantity },
+        { productId: itemToAdd._id, quantity: productToAdd ? 1 : quantity },
         config
       );
-      alert('Added to cart!');
+      alert(`${itemToAdd.name} added to cart!`);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to add to cart');
     } finally {
-      setAddingToCart(false);
+      if (!productToAdd) {
+        setAddingToCart(false);
+      }
     }
   };
 
@@ -368,6 +381,37 @@ const ProductDetails = () => {
               )}
             </button>
           </div>
+
+          {/* Accent Pairs Section */}
+          {product.accentPairs && product.accentPairs.length > 0 && (
+            <div className="mt-12 border-t pt-8">
+              <h3 className="font-serif text-2xl font-medium mb-6 text-gray-900">
+                Complete the Look
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {product.accentPairs.map((pair) => (
+                  <div 
+                    key={pair._id} 
+                    className="group cursor-pointer border rounded-xl p-3 hover:shadow-md transition-all"
+                    onClick={() => navigate(`/product/${pair._id}`)}
+                  >
+                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3">
+                      <img 
+                        src={pair.images?.[0] || FALLBACK_IMAGE} 
+                        alt={pair.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => e.currentTarget.src = FALLBACK_IMAGE}
+                      />
+                    </div>
+                    <h4 className="font-medium text-gray-900 truncate">{pair.name}</h4>
+                    <p className="text-sm text-rose-500 font-medium mt-1">
+                      Rs. {pair.price?.toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Review section */}
           {getUserInfo() && (

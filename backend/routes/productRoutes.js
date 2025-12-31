@@ -7,6 +7,34 @@ const Review = require('../models/Review');
 const Order = require('../models/Order');
 const { protect, admin } = require('../middleware/authMiddleware');
 
+// Helper to resolve product names to IDs
+const resolveProductNamesToIds = async (identifiers) => {
+  if (!identifiers || identifiers.length === 0) return [];
+  
+  // If identifiers are already ObjectIds (hex strings of length 24), keep them
+  // If they are names, find the products
+  const resolvedIds = [];
+  const namesToFind = [];
+
+  for (const id of identifiers) {
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      resolvedIds.push(id);
+    } else {
+      namesToFind.push(id.trim()); // Assume it's a name
+    }
+  }
+
+  if (namesToFind.length > 0) {
+    const foundProducts = await Product.find({
+      name: { $in: namesToFind.map(n => new RegExp(`^${n}$`, 'i')) } // Case-insensitive exact match
+    }).select('_id');
+    
+    foundProducts.forEach(p => resolvedIds.push(p._id));
+  }
+
+  return resolvedIds;
+};
+
 // Input validation middleware
 const validateProductInput = (req, res, next) => {
   const { name, price, description, category, images, stock } = req.body;
@@ -52,20 +80,33 @@ router.get('/', asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 12;
   const skip = (page - 1) * limit;
-  const keyword = req.query.keyword ? {
-    name: {
+  
+  // Build query
+  const query = {};
+
+  if (req.query.keyword) {
+    query.name = {
       $regex: req.query.keyword,
       $options: 'i'
-    }
-  } : {};
+    };
+  }
 
-  const products = await Product.find({ ...keyword })
+  if (req.query.category) {
+    query.category = req.query.category.toLowerCase();
+  }
+
+  if (req.query.tags) {
+    const tagsArray = req.query.tags.split(',').map(t => t.trim().toLowerCase());
+    query.tags = { $in: tagsArray };
+  }
+
+  const products = await Product.find(query)
     .sort('-createdAt')
     .limit(limit)
     .skip(skip)
     .populate('reviews', 'rating comment name');
 
-  const total = await Product.countDocuments({ ...keyword });
+  const total = await Product.countDocuments(query);
   
   res.json({
     products,
@@ -80,7 +121,8 @@ router.get('/', asyncHandler(async (req, res) => {
 // @access  Public
 router.get('/:id', asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id)
-    .populate('reviews', 'rating comment name createdAt user');
+    .populate('reviews', 'rating comment name createdAt user')
+    .populate('accentPairs', 'name price images category');
   
   if (product) {
     res.json(product);
@@ -94,7 +136,10 @@ router.get('/:id', asyncHandler(async (req, res) => {
 // @route   POST /api/products
 // @access  Private/Admin
 router.post('/', protect, admin, validateProductInput, asyncHandler(async (req, res) => {
-  const { name, price, description, category, images, stock } = req.body;
+  const { name, price, description, category, images, stock, tags, accentPairs } = req.body;
+
+  const resolvedAccentPairs = await resolveProductNamesToIds(accentPairs);
+
   const product = new Product({
     name,
     price,
@@ -102,10 +147,21 @@ router.post('/', protect, admin, validateProductInput, asyncHandler(async (req, 
     category,
     images,
     stock,
+    tags,
+    accentPairs: resolvedAccentPairs,
     user: req.user._id,
   });
 
   const createdProduct = await product.save();
+
+  // Bidirectional Update: Add this new product to the accentPairs of the referenced products
+  if (resolvedAccentPairs.length > 0) {
+    await Product.updateMany(
+      { _id: { $in: resolvedAccentPairs } },
+      { $addToSet: { accentPairs: createdProduct._id } }
+    );
+  }
+
   res.status(201).json(createdProduct);
 }));
 
@@ -122,6 +178,41 @@ router.put('/:id', protect, admin, validateProductInput, asyncHandler(async (req
     product.category = req.body.category || product.category;
     product.images = req.body.images || product.images;
     product.stock = req.body.stock !== undefined ? req.body.stock : product.stock;
+    product.tags = req.body.tags || product.tags;
+    
+    if (req.body.accentPairs) {
+      const oldPairs = (product.accentPairs || []).map(id => id.toString());
+      
+      // Ensure we only process valid inputs
+      const safeAccentPairs = Array.isArray(req.body.accentPairs) 
+        ? req.body.accentPairs.filter(p => p && typeof p === 'string' && p.trim() !== '')
+        : [];
+
+      const newPairsIds = await resolveProductNamesToIds(safeAccentPairs);
+      const newPairsStrings = newPairsIds.map(id => id.toString());
+
+      // Identify added and removed pairs
+      const added = newPairsIds.filter(id => !oldPairs.includes(id.toString()));
+      const removed = oldPairs.filter(id => !newPairsStrings.includes(id));
+
+      // Update added pairs: Add current product ID to them
+      if (added.length > 0) {
+        await Product.updateMany(
+          { _id: { $in: added } },
+          { $addToSet: { accentPairs: product._id } }
+        );
+      }
+
+      // Update removed pairs: Remove current product ID from them
+      if (removed.length > 0) {
+        await Product.updateMany(
+          { _id: { $in: removed } },
+          { $pull: { accentPairs: product._id } }
+        );
+      }
+
+      product.accentPairs = newPairsIds;
+    }
 
     const updatedProduct = await product.save();
     res.json(updatedProduct);
@@ -141,6 +232,12 @@ router.delete('/:id', protect, admin, asyncHandler(async (req, res) => {
     // Delete associated reviews
     await Review.deleteMany({ product: req.params.id });
     
+    // Remove this product from other products' accentPairs
+    await Product.updateMany(
+      { accentPairs: req.params.id },
+      { $pull: { accentPairs: req.params.id } }
+    );
+
     await product.deleteOne();
     res.json({ message: 'Product removed successfully' });
   } else {

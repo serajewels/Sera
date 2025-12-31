@@ -32,11 +32,11 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     }
   }
 
-  // All validations passed - now update stock
+  // All validations passed - now update stock and sales
   for (const item of orderItems) {
     await Product.findByIdAndUpdate(
       item.product,
-      { $inc: { stock: -item.quantity } }
+      { $inc: { stock: -item.quantity, sales: item.quantity } }
     );
   }
 
@@ -173,11 +173,11 @@ router.put('/:id/cancel', protect, asyncHandler(async (req, res) => {
     cancellationFee = 100;
   }
 
-  // Restore product stock
+  // Restore product stock and decrease sales count
   for (const item of order.items) {
     await Product.findByIdAndUpdate(
       item.product._id,
-      { $inc: { stock: item.quantity } }
+      { $inc: { stock: item.quantity, sales: -item.quantity } }
     );
   }
 
