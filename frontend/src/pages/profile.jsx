@@ -512,24 +512,35 @@ const Profile = () => {
 
                   <div className="border-t border-gray-100 pt-6">
                     <h3 className="text-lg font-serif text-gray-900 mb-4">Password Change</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">New Password (leave blank to keep current)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Password (required to set new password)</label>
                         <input 
                           type="password"
                           className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-1 focus:ring-rose-500 outline-none"
-                          value={profileData.password}
-                          onChange={(e) => setProfileData({...profileData, password: e.target.value})}
+                          value={profileData.currentPassword}
+                          onChange={(e) => setProfileData({...profileData, currentPassword: e.target.value})}
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                        <input 
-                          type="password"
-                          className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-1 focus:ring-rose-500 outline-none"
-                          value={profileData.confirmPassword}
-                          onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                          <input 
+                            type="password"
+                            className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-1 focus:ring-rose-500 outline-none"
+                            value={profileData.password}
+                            onChange={(e) => setProfileData({...profileData, password: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                          <input 
+                            type="password"
+                            className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-1 focus:ring-rose-500 outline-none"
+                            value={profileData.confirmPassword}
+                            onChange={(e) => setProfileData({...profileData, confirmPassword: e.target.value})}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

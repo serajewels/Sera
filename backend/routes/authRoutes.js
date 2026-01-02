@@ -7,7 +7,7 @@ const Product = require('../models/Product');
 const jwt = require('jsonwebtoken');
 const { protect } = require('../middleware/authMiddleware');
 const mongoose = require('mongoose');
-const { sendOTPEmail } = require('../services/emailService');
+const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
@@ -407,6 +407,111 @@ router.get('/users', protect, asyncHandler(async (req, res) => {
   }
   const users = await User.find({});
   res.json(users);
+}));
+
+// @desc    Forgot Password - Send OTP
+// @route   POST /api/auth/forgot-password
+// @access  Public
+router.post('/forgot-password', asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400);
+    throw new Error('Please provide email');
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found with this email');
+  }
+
+  // Generate OTP
+  const otp = generateOTP();
+
+  // Save OTP and expiry (10 mins) to user
+  user.resetPasswordOtp = otp;
+  user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+  await user.save();
+
+  try {
+    await sendPasswordResetEmail(email, otp);
+    
+    res.json({
+      success: true,
+      message: 'Password reset OTP sent to your email.'
+    });
+  } catch (error) {
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    
+    console.error('Forgot password error:', error);
+    res.status(500);
+    throw new Error('Failed to send password reset email. Please try again.');
+  }
+}));
+
+// @desc    Reset Password - Verify OTP and Set New Password
+// @route   POST /api/auth/reset-password
+// @access  Public
+router.post('/reset-password', asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    res.status(400);
+    throw new Error('Please provide all required fields');
+  }
+
+  const user = await User.findOne({
+    email,
+    resetPasswordOtp: otp,
+    resetPasswordExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    res.status(400);
+    throw new Error('Invalid or expired OTP');
+  }
+
+  // Set new password
+  user.password = newPassword;
+  user.resetPasswordOtp = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+
+  res.json({
+    success: true,
+    message: 'Password reset successful. You can now login with your new password.'
+  });
+}));
+
+// @desc    Change Password - Logged in user
+// @route   PUT /api/auth/change-password
+// @access  Private
+router.put('/change-password', protect, asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  
+  if (!currentPassword || !newPassword) {
+    res.status(400);
+    throw new Error('Please provide current and new password');
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (user && (await user.matchPassword(currentPassword))) {
+    user.password = newPassword;
+    await user.save();
+    
+    res.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } else {
+    res.status(401);
+    throw new Error('Invalid current password');
+  }
 }));
 
 module.exports = router;

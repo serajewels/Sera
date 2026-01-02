@@ -77,6 +77,7 @@ const Login = () => {
             </form>
 
             <div className="mt-8 text-center text-sm text-gray-600">
+              <p className="mb-2"><Link to="/forgot-password" className="text-gray-500 hover:text-rose-500 transition-colors">Forgot your password?</Link></p>
               <p>Don't have an account? <Link to="/register" className="text-[#c5a666] font-semibold hover:underline">Create one</Link></p>
             </div>
           </motion.div>

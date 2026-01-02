@@ -155,4 +155,112 @@ const sendOTPEmail = async (email, otp) => {
   }
 };
 
-module.exports = { sendOTPEmail };
+// Send Password Reset Email
+const sendPasswordResetEmail = async (email, otp) => {
+  const mailOptions = {
+    from: `"Sera Jewelry" <${process.env.SMTP_FROM}>`,
+    to: email,
+    subject: 'Sera - Password Reset Request',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            font-family: 'Arial', sans-serif;
+            background-color: #fdf2f8;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+          }
+          .header {
+            background: linear-gradient(135deg, #c5a666 0%, #b09458 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 300;
+            letter-spacing: 3px;
+          }
+          .content {
+            padding: 40px 30px;
+            text-align: center;
+          }
+          .content h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+          }
+          .content p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+          }
+          .otp-box {
+            background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+            border: 2px solid #c5a666;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            display: inline-block;
+          }
+          .otp-code {
+            font-size: 48px;
+            font-weight: bold;
+            color: #c5a666;
+            letter-spacing: 12px;
+            margin: 0;
+            font-family: 'Courier New', monospace;
+          }
+          .footer {
+            background-color: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 20px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>SERA</h1>
+            <p>JEWELRY</p>
+          </div>
+          <div class="content">
+            <h2>Password Reset Request</h2>
+            <p>We received a request to reset your password. Use the OTP below to reset it.</p>
+            <div class="otp-box">
+              <p class="otp-code">${otp}</p>
+            </div>
+            <p>This OTP is valid for 10 minutes. If you didn't request this, please ignore this email.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} Sera Jewelry. All rights reserved.</p>
+            <p>This is an automated message, please do not reply.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
+module.exports = { sendOTPEmail, sendPasswordResetEmail };
