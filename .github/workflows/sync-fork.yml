@@ -1,4 +1,4 @@
-name: Sync Fork
+name: Fork Sync
 on:
   push:
     branches: [ master ]
@@ -6,10 +6,8 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-    - uses: repo-sync/pull-request@v2
+    - name: Fork Sync
+      uses: aormsby/Fork-Sync-With-Upstream-action@v3.1
       with:
-        source_repo: "himanklalani/Sera"
-        destination_repo: "serajewels/Sera"
-        source_branch: "master"
-        destination_branch: "master"
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        target_sync_branch: master
+        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
