@@ -25,7 +25,7 @@ const Shop = () => {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get('http://localhost:5000/api/products');
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
       const safeProducts = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
       setProducts(safeProducts);
       setFilteredProducts(safeProducts);
@@ -173,7 +173,7 @@ const Shop = () => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-      await axios.post('http://localhost:5000/api/cart', { productId, quantity: 1 }, config);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/cart`, { productId, quantity: 1 }, config);
       alert('Added to cart!');
     } catch (error) {
       console.error('Add to cart error:', error);

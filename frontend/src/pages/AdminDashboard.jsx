@@ -34,7 +34,7 @@ const AdminDashboard = () => {
   
   const fetchAllProducts = async () => {
     try {
-      const { data } = await axios.get('http://localhost:5000/api/products');
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
       setAllProducts(
         Array.isArray(data?.products) 
           ? data.products 
@@ -225,7 +225,7 @@ const AdminDashboard = () => {
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
 
       if (activeTab === 'products') {
-        const { data } = await axios.get('http://localhost:5000/api/products');
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
         setProducts(
           Array.isArray(data?.products)
             ? data.products
@@ -234,17 +234,17 @@ const AdminDashboard = () => {
             : []
         );
       } else if (activeTab === 'users') {
-        const { data } = await axios.get('http://localhost:5000/api/auth/users', config);
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/users`, config);
         setUsers(Array.isArray(data) ? data : []);
       } else if (activeTab === 'categories') {
-        const { data } = await axios.get('http://localhost:5000/api/categories');
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
         setCategories(Array.isArray(data) ? data : []);
       } else if (activeTab === 'contact') {
-        const { data } = await axios.get('http://localhost:5000/api/contact', config);
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/contact`, config);
         setContacts(Array.isArray(data?.data) ? data.data : []);
       } else if (activeTab === 'orders') {
         const { data } = await axios.get(
-          'http://localhost:5000/api/orders/all/admin',
+          `${import.meta.env.VITE_API_URL}/api/orders/all/admin`,
           config
         );
         setOrders(Array.isArray(data) ? data : []);
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
       }
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
       await axios.put(
-        `http://localhost:5000/api/orders/${orderId}/status`,
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/status`,
         { status: newStatus },
         config
       );
@@ -312,7 +312,7 @@ const AdminDashboard = () => {
       }
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
       await axios.put(
-        `http://localhost:5000/api/orders/${orderId}/exchange/approve`,
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/exchange/approve`,
         { approved },
         config
       );
@@ -368,7 +368,7 @@ const AdminDashboard = () => {
       };
 
       await axios.put(
-        `http://localhost:5000/api/orders/${editingOrder._id}/update`,
+        `${import.meta.env.VITE_API_URL}/api/orders/${editingOrder._id}/update`,
         payload,
         config
       );
@@ -391,7 +391,7 @@ const AdminDashboard = () => {
         return;
       }
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
-      await axios.delete(`http://localhost:5000/api/categories/${id}`, config);
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/categories/${id}`, config);
       fetchData();
     } catch (error) {
       console.error(error);
@@ -404,7 +404,7 @@ const AdminDashboard = () => {
     if (product) {
       // Fetch full details to get populated accentPairs (names)
       try {
-        const { data } = await axios.get(`http://localhost:5000/api/products/${product._id}`);
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${product._id}`);
         setEditingProduct(data);
         
         // Determine styles from tags
@@ -469,10 +469,10 @@ const AdminDashboard = () => {
         },
       };
 
-      const { data } = await axios.post('http://localhost:5000/api/upload', formDataUpload, config);
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formDataUpload, config);
       
       // Append the new image URL to the existing images string
-      const fullUrl = `http://localhost:5000${data}`; // Ensure full path if relative
+      const fullUrl = `${import.meta.env.VITE_API_URL}${data}`; // Ensure full path if relative
       setFormData(prev => ({
         ...prev,
         images: prev.images ? `${prev.images}, ${fullUrl}` : fullUrl
@@ -494,7 +494,7 @@ const AdminDashboard = () => {
         return;
       }
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
-      await axios.delete(`http://localhost:5000/api/products/${id}`, config);
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/products/${id}`, config);
       fetchData();
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -530,12 +530,12 @@ const AdminDashboard = () => {
     try {
       if (editingProduct) {
         await axios.put(
-          `http://localhost:5000/api/products/${editingProduct._id}`,
+          `${import.meta.env.VITE_API_URL}/api/products/${editingProduct._id}`,
           productData,
           config
         );
       } else {
-        await axios.post('http://localhost:5000/api/products', productData, config);
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/products`, productData, config);
       }
       setIsModalOpen(false);
       fetchData();
@@ -554,7 +554,7 @@ const AdminDashboard = () => {
       }
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
       await axios.put(
-        `http://localhost:5000/api/contact/${contactId}/status`,
+        `${import.meta.env.VITE_API_URL}/api/contact/${contactId}/status`,
         { status: newStatus },
         config
       );

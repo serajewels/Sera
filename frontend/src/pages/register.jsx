@@ -21,7 +21,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/register', { 
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/register`, { 
         name, 
         email, 
         password, 
@@ -42,7 +42,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/verify-otp', { 
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, { 
         email, 
         otp 
       });
@@ -60,7 +60,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:5000/api/auth/resend-otp', { email });
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/resend-otp`, { email });
       alert('OTP resent successfully! Check your email.');
       setLoading(false);
     } catch (err) {

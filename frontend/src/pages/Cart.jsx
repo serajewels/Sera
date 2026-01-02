@@ -28,7 +28,7 @@ const Cart = () => {
         headers: { Authorization: `Bearer ${userInfo.token}` },
       };
 
-      const { data } = await axios.get('http://localhost:5000/api/cart', config);
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/cart`, config);
       setCartItems(Array.isArray(data.items) ? data.items : []);
     } catch (error) {
       console.error('Error fetching cart:', error);
@@ -52,7 +52,7 @@ const Cart = () => {
 
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       const { data } = await axios.put(
-        `http://localhost:5000/api/cart/${productId}`,
+        `${import.meta.env.VITE_API_URL}/api/cart/${productId}`,
         { quantity: newQuantity },
         config
       );
@@ -72,7 +72,7 @@ const Cart = () => {
 
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       const { data } = await axios.delete(
-        `http://localhost:5000/api/cart/${productId}`,
+        `${import.meta.env.VITE_API_URL}/api/cart/${productId}`,
         config
       );
       setCartItems(Array.isArray(data.items) ? data.items : []);

@@ -32,11 +32,11 @@ const Checkout = () => {
         const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
         
         // Fetch Cart
-        const cartRes = await axios.get('http://localhost:5000/api/cart', config);
+        const cartRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/cart`, config);
         setCartItems(cartRes.data.items || []);
 
         // Fetch Addresses (Profile)
-        const profileRes = await axios.get('http://localhost:5000/api/auth/profile', config);
+        const profileRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/profile`, config);
         setAddresses(profileRes.data.addresses || []);
         
         if (profileRes.data.addresses && profileRes.data.addresses.length > 0) {
@@ -88,10 +88,10 @@ const Checkout = () => {
         totalPrice: total
       };
 
-      await axios.post('http://localhost:5000/api/orders', orderData, config);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, orderData, config);
       
       // Optionally clear cart here if backend doesn't do it automatically
-      // await axios.delete('http://localhost:5000/api/cart', config); // If we implemented clear cart endpoint
+      // await axios.delete('`${import.meta.env.VITE_API_URL}`/api/cart', config); // If we implemented clear cart endpoint
 
       // alert('Order placed successfully!');
       navigate('/order-success');

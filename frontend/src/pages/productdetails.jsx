@@ -40,7 +40,7 @@ const ProductDetails = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const { data } = await axios.get(`http://localhost:5000/api/products/${id}`);
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${id}`);
         setProduct(data);
 
         const ui = getUserInfo();
@@ -50,7 +50,7 @@ const ProductDetails = () => {
           const config = { headers: { Authorization: `Bearer ${ui.token}` } };
           try {
             const wishlistRes = await axios.get(
-              'http://localhost:5000/api/auth/wishlist',
+              `${import.meta.env.VITE_API_URL}/api/auth/wishlist`,
               config
             );
             const wishlist = wishlistRes.data || [];
@@ -82,7 +82,7 @@ const ProductDetails = () => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const { data } = await axios.get(
-        `http://localhost:5000/api/products/${productId}/review-eligibility`,
+        `${import.meta.env.VITE_API_URL}/api/products/${productId}/review-eligibility`,
         config
       );
       setCanReview(data.canReview);
@@ -107,7 +107,7 @@ const ProductDetails = () => {
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
 
       await axios.post(
-        `http://localhost:5000/api/products/${id}/reviews`,
+        `${import.meta.env.VITE_API_URL}/api/products/${id}/reviews`,
         {
           rating: userRating,
           comment: reviewComment.trim(),
@@ -115,7 +115,7 @@ const ProductDetails = () => {
         config
       );
 
-      const { data } = await axios.get(`http://localhost:5000/api/products/${id}`);
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${id}`);
       setProduct(data);
 
       setShowReviewForm(false);
@@ -152,7 +152,7 @@ const ProductDetails = () => {
     try {
       const config = { headers: { Authorization: `Bearer ${ui.token}` } };
       await axios.post(
-        'http://localhost:5000/api/cart',
+        `${import.meta.env.VITE_API_URL}/api/cart`,
         { productId: itemToAdd._id, quantity: productToAdd ? 1 : quantity },
         config
       );
@@ -178,14 +178,14 @@ const ProductDetails = () => {
 
       if (isInWishlist) {
         await axios.delete(
-          `http://localhost:5000/api/auth/wishlist/${id}`,
+          `${import.meta.env.VITE_API_URL}/api/auth/wishlist/${id}`,
           config
         );
         setIsInWishlist(false);
         alert('Removed from wishlist');
       } else {
         await axios.post(
-          'http://localhost:5000/api/auth/wishlist',
+          `${import.meta.env.VITE_API_URL}/api/auth/wishlist`,
           { productId: id },
           config
         );

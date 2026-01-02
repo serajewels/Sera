@@ -17,7 +17,7 @@ const ForgotPassword = () => {
     setError('');
 
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/forgot-password', { email });
+      const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, { email });
       setMessage(data.message);
       // Optional: Redirect to reset password page after a delay or immediately
       setTimeout(() => {

@@ -49,15 +49,15 @@ const Profile = () => {
           Authorization: `Bearer ${parsedUser.token}`,
         },
       };
-      const { data } = await axios.get('http://localhost:5000/api/auth/profile', config);
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/profile`, config);
       setAddresses(data.addresses || []);
       
-      const wishlistRes = await axios.get('http://localhost:5000/api/auth/wishlist', config);
+      const wishlistRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/wishlist`, config);
       setWishlist(wishlistRes.data || []);
 
       // Fetch Orders
       try {
-        const ordersRes = await axios.get('http://localhost:5000/api/orders', config);
+        const ordersRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/orders`, config);
         setOrders(ordersRes.data || []);
       } catch (err) {
         console.error("Error fetching orders:", err);
@@ -82,7 +82,7 @@ const Profile = () => {
           Authorization: `Bearer ${userInfo.token}`,
         },
       };
-      const { data } = await axios.put('http://localhost:5000/api/auth/profile', { addresses: updatedAddresses }, config);
+      const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/auth/profile`, { addresses: updatedAddresses }, config);
       setAddresses(data.addresses);
     } catch (error) {
       console.error('Error updating addresses:', error);
@@ -99,7 +99,7 @@ const Profile = () => {
           Authorization: `Bearer ${userInfo.token}`,
         },
       };
-      const { data } = await axios.put(`http://localhost:5000/api/orders/${orderId}/cancel`, {}, config);
+      const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/cancel`, {}, config);
       alert(`Order cancelled successfully. ${data.cancellationFee > 0 ? `Cancellation fee: Rs. ${data.cancellationFee}` : 'No cancellation fee.'} Refund: Rs. ${data.refundAmount}`);
       fetchProfile();
     } catch (error) {
@@ -120,7 +120,7 @@ const Profile = () => {
           Authorization: `Bearer ${userInfo.token}`,
         },
       };
-      const { data } = await axios.put(`http://localhost:5000/api/orders/${selectedOrderId}/exchange`, { reason: exchangeReason }, config);
+      const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrderId}/exchange`, { reason: exchangeReason }, config);
       alert(`Exchange requested successfully. ${data.exchangeFee > 0 ? `Exchange fee: Rs. ${data.exchangeFee}` : 'Free exchange (damaged/defective item)'}`);
       setExchangeModalOpen(false);
       setExchangeReason('');
@@ -205,7 +205,7 @@ const Profile = () => {
         updatePayload.password = profileData.password;
       }
 
-      const { data } = await axios.put('http://localhost:5000/api/auth/profile', updatePayload, config);
+      const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/auth/profile`, updatePayload, config);
       
       localStorage.setItem('userInfo', JSON.stringify(data));
       setUserInfo(data);
