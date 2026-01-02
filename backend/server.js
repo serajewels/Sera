@@ -5,20 +5,19 @@ require('dotenv').config();
 
 const app = express();
 
-// Define allowed origins
+// Define allowed origins (add your Vercel frontend URL after deployment)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://192.168.29.61:5173'
+  'http://192.168.29.61:5173',
+  // Add: 'https://your-frontend.vercel.app' after Vercel deployment
 ];
 
 // Middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman)
       if (!origin) return callback(null, true);
-      
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -46,7 +45,8 @@ app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 
 const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
+// Serve uploads from public/static (Vercel requirement)
+app.use('/uploads', express.static(path.join(__dirname, 'public/static/uploads')));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -54,5 +54,5 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Export for Vercel serverless
+module.exports = app;
