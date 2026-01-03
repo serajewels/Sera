@@ -464,7 +464,8 @@ const Profile = () => {
                         {order.items.map((item, idx) => (
                           <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
                             <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden">
-                              {item.product?.images?. && (
+                              {item.product?.images?.[0] && (  
+
                                 <img src={item.product.images} alt={item.product.name} className="w-full h-full object-cover" />
                               )}
                             </div>
