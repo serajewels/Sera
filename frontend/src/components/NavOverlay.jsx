@@ -14,9 +14,10 @@ export default function NavOverlay({ isOpen, onClose }) {
 
   const menuItems = [
     { title: 'My Account', path: '/profile' },
-    { title: 'Wishlist', path: '/profile?tab=wishlist' }, // Placeholder route
+    { title: 'Wishlist', path: '/profile?tab=wishlist' },
     { 
       title: 'Products', 
+      path: '/shop', // Add this line
       isExpandable: true,
       subItems: [
         { name: 'Necklace', path: '/shop?category=Necklace' }, 
@@ -27,7 +28,8 @@ export default function NavOverlay({ isOpen, onClose }) {
     },
     { title: 'Contact Us', path: '/contact' },
     { title: 'FAQ', path: '/faq' }
-  ];
+];
+
 
   return (
     <AnimatePresence>
