@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaFilter, FaSearch, FaShoppingCart, FaHeart, FaTimes, FaCheck } from 'react-icons/fa';
+import { FaFilter, FaSearch, FaShoppingCart, FaTimes, FaCheck, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
-
 const Shop = () => {
+  // ✅ NEW: Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12; // Shows 12 products per page
+
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,12 +19,10 @@ const Shop = () => {
   const [priceRange, setPriceRange] = useState(10000);
   const [showInStock, setShowInStock] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  
   const location = useLocation();
   const navigate = useNavigate();
-
-
   const categories = ['All', 'Necklace', 'Earrings', 'Bracelet', 'Rings'];
-
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -30,6 +31,7 @@ const Shop = () => {
       const safeProducts = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
       setProducts(safeProducts);
       setFilteredProducts(safeProducts);
+      setCurrentPage(1); // ✅ Reset to page 1 when products change
     } catch (error) {
       console.error('Error fetching products:', error);
       setProducts([]);
@@ -39,17 +41,14 @@ const Shop = () => {
     }
   }, []);
 
-
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
-
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const categoryParam = params.get('category');
     const tagsParam = params.get('tags');
-
 
     if (categoryParam) {
       const formattedCategory = categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1).toLowerCase();
@@ -58,19 +57,19 @@ const Shop = () => {
       setSelectedCategory('All');
     }
 
-
     if (tagsParam) {
       setSelectedTags(tagsParam.split(',').map(t => t.trim()));
     } else {
       setSelectedTags([]);
     }
+    
+    setCurrentPage(1); // ✅ Reset pagination when filters change
   }, [location]);
 
-
-  useEffect(() => {
+  // ✅ OPTIMIZED: Use useMemo to prevent unnecessary filter recalculation
+  const filteredAndPaginatedProducts = useMemo(() => {
     const safeProducts = Array.isArray(products) ? products : [];
     let result = safeProducts;
-
 
     // Filter by Category
     if (selectedCategory !== 'All') {
@@ -80,13 +79,10 @@ const Shop = () => {
       );
     }
 
-
-    // Filter by Stock Status - FIXED: Only filter when showInStock is true
+    // Filter by Stock Status
     if (showInStock) {
       result = result.filter(p => p.stock > 0);
     }
-    // When showInStock is false, show ALL products regardless of stock
-
 
     // Filter by Tags
     if (selectedTags.length > 0) {
@@ -104,9 +100,9 @@ const Shop = () => {
         if (selectedCategory === 'All') {
           const grouped = {};
           result.forEach(p => {
-             const cat = p.category || 'Uncategorized';
-             if (!grouped[cat]) grouped[cat] = [];
-             grouped[cat].push(p);
+            const cat = p.category || 'Uncategorized';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(p);
           });
           
           const bestsellers = [];
@@ -121,7 +117,7 @@ const Shop = () => {
           });
           result = bestsellers;
         } else {
-           result.sort((a, b) => (b.sales || 0) - (a.sales || 0));
+          result.sort((a, b) => (b.sales || 0) - (a.sales || 0));
         }
       } else {
         result = result.filter(p => 
@@ -129,7 +125,6 @@ const Shop = () => {
         );
       }
     }
-
 
     // Filter by Search Query
     if (searchQuery.trim()) {
@@ -139,27 +134,32 @@ const Shop = () => {
       );
     }
 
-
     // Filter by Price Range
     result = result.filter(p => 
       p.price && typeof p.price === 'number' && p.price <= priceRange
     );
 
-
     setFilteredProducts(result);
+    setCurrentPage(1); // ✅ Reset to page 1 when filters change
+    return result;
   }, [products, selectedCategory, searchQuery, priceRange, selectedTags, showInStock]);
 
+  // ✅ NEW: Calculate pagination values
+  const totalPages = Math.ceil(filteredAndPaginatedProducts.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedProducts = filteredAndPaginatedProducts.slice(startIndex, endIndex);
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
     setShowFilters(false);
+    setCurrentPage(1); // ✅ Reset pagination
     if (category === 'All') {
       navigate('/shop');
     } else {
       navigate(`/shop?category=${category.toLowerCase()}`);
     }
   };
-
 
   const addToCart = async (e, productId) => {
     e.preventDefault();
@@ -171,7 +171,6 @@ const Shop = () => {
       return;
     }
 
-
     try {
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       await axios.post(`${import.meta.env.VITE_API_URL}/api/cart`, { productId, quantity: 1 }, config);
@@ -182,7 +181,7 @@ const Shop = () => {
     }
   };
 
-
+  // ✅ OPTIMIZED: Only render paginated products
   const renderProducts = () => {
     if (loading) {
       return (
@@ -203,8 +202,7 @@ const Shop = () => {
       );
     }
 
-
-    if (filteredProducts.length === 0) {
+    if (paginatedProducts.length === 0 && filteredAndPaginatedProducts.length === 0) {
       return (
         <div className="text-center py-12 md:py-20 col-span-full">
           <motion.div
@@ -223,6 +221,7 @@ const Shop = () => {
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('All');
+                setCurrentPage(1);
                 navigate('/shop');
               }}
               className="bg-rose-500 text-white px-6 md:px-8 py-2 md:py-3 rounded-lg font-medium hover:bg-rose-600 transition-colors text-sm md:text-base"
@@ -234,8 +233,7 @@ const Shop = () => {
       );
     }
 
-
-    return filteredProducts.map(product => (
+    return paginatedProducts.map(product => (
       <Link 
         to={`/product/${product._id}`} 
         key={product._id || Math.random()} 
@@ -250,13 +248,13 @@ const Shop = () => {
               src={product.images?.[0] || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E'} 
               alt={product.name || 'Product'}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              loading="lazy" // ✅ NEW: Lazy load images
               onError={(e) => {
                 e.target.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E';
               }}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
             
-            {/* Stock Badge */}
             {product.stock === 0 && (
               <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                 Out of Stock
@@ -296,6 +294,75 @@ const Shop = () => {
     ));
   };
 
+  // ✅ NEW: Pagination controls component
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const pageNumbers = [];
+    const maxVisible = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    
+    if (endPage - startPage < maxVisible - 1) {
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(1);
+      if (startPage > 2) pageNumbers.push('...');
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) pageNumbers.push('...');
+      pageNumbers.push(totalPages);
+    }
+
+    return (
+      <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+          disabled={currentPage === 1}
+          className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Previous page"
+        >
+          <FaChevronLeft className="w-4 h-4" />
+        </button>
+
+        {pageNumbers.map((num, idx) => (
+          <button
+            key={idx}
+            onClick={() => typeof num === 'number' && setCurrentPage(num)}
+            disabled={num === '...'}
+            className={`
+              px-3 py-2 rounded-lg font-medium transition-colors
+              ${num === currentPage 
+                ? 'bg-rose-500 text-white' 
+                : num === '...'
+                ? 'cursor-default text-gray-500'
+                : 'border border-gray-300 hover:bg-rose-50 hover:border-rose-500'
+              }
+            `}
+          >
+            {num}
+          </button>
+        ))}
+
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+          disabled={currentPage === totalPages}
+          className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Next page"
+        >
+          <FaChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-white pt-16 md:pt-20">
@@ -318,7 +385,6 @@ const Shop = () => {
         </p>
       </div>
 
-
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-12">
         {/* Mobile Filter Button */}
         <button
@@ -327,7 +393,6 @@ const Shop = () => {
         >
           {showFilters ? <FaTimes className="w-5 h-5" /> : <FaFilter className="w-5 h-5" />}
         </button>
-
 
         <div className="flex flex-col lg:flex-row gap-6 md:gap-12">
           {/* Sidebar / Filters */}
@@ -347,14 +412,12 @@ const Shop = () => {
                   ${showFilters ? 'block' : 'hidden lg:block'}
                 `}
               >
-                {/* Mobile Close Button */}
                 <button
                   onClick={() => setShowFilters(false)}
                   className="lg:hidden absolute top-4 right-4 text-gray-500 hover:text-gray-700"
                 >
                   <FaTimes className="w-6 h-6" />
                 </button>
-
 
                 {/* Categories */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border mt-12 lg:mt-0">
@@ -379,7 +442,6 @@ const Shop = () => {
                   </ul>
                 </div>
 
-
                 {/* Stock Filter */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -401,7 +463,6 @@ const Shop = () => {
                   </label>
                 </div>
 
-
                 {/* Search */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -419,7 +480,6 @@ const Shop = () => {
             )}
           </AnimatePresence>
 
-
           {/* Overlay for mobile */}
           {showFilters && (
             <div 
@@ -427,7 +487,6 @@ const Shop = () => {
               onClick={() => setShowFilters(false)}
             />
           )}
-
 
           {/* Product Grid */}
           <motion.div 
@@ -437,20 +496,23 @@ const Shop = () => {
           >
             <div className="mb-4 md:mb-8 flex items-center justify-between flex-wrap gap-2 md:gap-4">
               <div className="text-xs md:text-sm text-gray-600">
-                Showing {filteredProducts.length} of {products.length} products
+                {/* ✅ NEW: Updated product count info */}
+                Showing {startIndex + 1}–{Math.min(endIndex, filteredAndPaginatedProducts.length)} of {filteredAndPaginatedProducts.length} products 
+                {filteredAndPaginatedProducts.length < products.length && ` (filtered from ${products.length})`}
               </div>
             </div>
-
 
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {renderProducts()}
             </div>
+
+            {/* ✅ NEW: Pagination controls */}
+            {renderPagination()}
           </motion.div>
         </div>
       </div>
     </div>
   );
 };
-
 
 export default Shop;

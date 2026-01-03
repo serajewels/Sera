@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaTimes, FaCheck, FaSearch, FaFilter } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaTimes, FaCheck, FaSearch, FaFilter, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -16,6 +16,11 @@ const AdminDashboard = () => {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
+
+  // PAGINATION STATE FOR ALL SECTIONS
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Items per page for all sections
+
   const [orderForm, setOrderForm] = useState({
     shippingAddress: {
       street: '',
@@ -29,6 +34,7 @@ const AdminDashboard = () => {
     status: '',
     items: []
   });
+
   const [selectedContact, setSelectedContact] = useState(null);
   const navigate = useNavigate();
 
@@ -108,6 +114,7 @@ const AdminDashboard = () => {
 
     searchTimeoutRef.current = setTimeout(() => {
       setDebouncedSearch(searchInput);
+      setCurrentPage(1); // Reset to first page on search
     }, 300);
 
     return () => {
@@ -198,6 +205,28 @@ const AdminDashboard = () => {
   const filteredOrders = useMemo(() => filterOrders(orders), [orders, filterOrders]);
   const filteredCategories = categories;
 
+  // PAGINATION LOGIC - Works for all sections
+  const getPaginatedData = (data) => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const paginatedProducts = useMemo(() => getPaginatedData(filteredProducts), [filteredProducts, currentPage]);
+  const paginatedUsers = useMemo(() => getPaginatedData(filteredUsers), [filteredUsers, currentPage]);
+  const paginatedContacts = useMemo(() => getPaginatedData(filteredContacts), [filteredContacts, currentPage]);
+  const paginatedOrders = useMemo(() => getPaginatedData(filteredOrders), [filteredOrders, currentPage]);
+  const paginatedCategories = useMemo(() => getPaginatedData(filteredCategories), [filteredCategories, currentPage]);
+
+  // Calculate total pages for each section
+  const getTotalPages = (data) => Math.ceil(data.length / itemsPerPage);
+  
+  const totalPagesProducts = getTotalPages(filteredProducts);
+  const totalPagesUsers = getTotalPages(filteredUsers);
+  const totalPagesContacts = getTotalPages(filteredContacts);
+  const totalPagesOrders = getTotalPages(filteredOrders);
+  const totalPagesCategories = getTotalPages(filteredCategories);
+
   useEffect(() => {
     const ui = getUserInfo();
     if (!ui || ui.role !== 'admin') {
@@ -209,6 +238,7 @@ const AdminDashboard = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setCurrentPage(1); // Reset pagination when fetching new data
     try {
       const ui = getUserInfo();
       if (!ui || ui.role !== 'admin') {
@@ -219,13 +249,12 @@ const AdminDashboard = () => {
 
       if (activeTab === 'products') {
         const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
-        setProducts(
-          Array.isArray(data?.products)
-            ? data.products
-            : Array.isArray(data)
-            ? data
-            : []
-        );
+        const productList = Array.isArray(data?.products)
+          ? data.products
+          : Array.isArray(data)
+          ? data
+          : [];
+        setProducts(productList);
       } else if (activeTab === 'users') {
         const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/users`, config);
         setUsers(Array.isArray(data) ? data : []);
@@ -267,6 +296,7 @@ const AdminDashboard = () => {
       dateFrom: '',
       dateTo: '',
     });
+    setCurrentPage(1);
   };
 
   const handleOrderStatus = async (orderId, newStatus) => {
@@ -781,6 +811,67 @@ const AdminDashboard = () => {
     );
   };
 
+  // UNIVERSAL PAGINATION COMPONENT - Works for all sections
+  const PaginationControls = ({ currentPage, totalPages, onPageChange, itemCount, totalCount }) => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-between mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="text-sm text-gray-600">
+          Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span> | 
+          Showing: <span className="font-semibold">{itemCount}</span> | Total: <span className="font-semibold">{totalCount}</span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <FaChevronLeft className="w-4 h-4" /> Previous
+          </button>
+          
+          {/* Page number buttons */}
+          <div className="flex gap-1">
+            {[...Array(totalPages)].map((_, idx) => {
+              const pageNum = idx + 1;
+              if (
+                pageNum === 1 ||
+                pageNum === totalPages ||
+                (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+              ) {
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => onPageChange(pageNum)}
+                    className={`px-3 py-2 rounded-lg transition-colors ${
+                      pageNum === currentPage
+                        ? 'bg-rose-500 text-white'
+                        : 'border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              }
+              if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                return <span key={pageNum} className="px-2 py-2">...</span>;
+              }
+              return null;
+            })}
+          </div>
+
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next <FaChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderProductsTable = () => {
     if (loading) {
       return (
@@ -807,45 +898,54 @@ const AdminDashboard = () => {
       );
     }
     return (
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 font-medium text-gray-500">Name</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Category</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Price</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Stock</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredProducts.map((product) => (
-              <tr key={product._id || Math.random()}>
-                <td className="px-6 py-4">{product.name || 'Unnamed Product'}</td>
-                <td className="px-6 py-4">{product.category || 'N/A'}</td>
-                <td className="px-6 py-4">INR {product.price || 0}</td>
-                <td className="px-6 py-4">{product.stock || 0}</td>
-                <td className="px-6 py-4 flex gap-4">
-                  <button
-                    onClick={() => handleOpenModal(product)}
-                    className="text-blue-600 hover:text-blue-800"
-                    title="Edit"
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product._id)}
-                    className="text-red-600 hover:text-red-800"
-                    title="Delete"
-                  >
-                    <FaTrash />
-                  </button>
-                </td>
+      <>
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 font-medium text-gray-500">Name</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Category</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Price</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Stock</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {paginatedProducts.map((product) => (
+                <tr key={product._id || Math.random()}>
+                  <td className="px-6 py-4">{product.name || 'Unnamed Product'}</td>
+                  <td className="px-6 py-4">{product.category || 'N/A'}</td>
+                  <td className="px-6 py-4">INR {product.price || 0}</td>
+                  <td className="px-6 py-4">{product.stock || 0}</td>
+                  <td className="px-6 py-4 flex gap-4">
+                    <button
+                      onClick={() => handleOpenModal(product)}
+                      className="text-blue-600 hover:text-blue-800"
+                      title="Edit"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(product._id)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Delete"
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <PaginationControls 
+          currentPage={currentPage} 
+          totalPages={totalPagesProducts}
+          itemCount={paginatedProducts.length}
+          totalCount={filteredProducts.length}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </>
     );
   };
 
@@ -863,28 +963,37 @@ const AdminDashboard = () => {
       );
     }
     return (
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 font-medium text-gray-500">Name</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Email</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Role</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Phone</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredUsers.map((user) => (
-              <tr key={user._id || Math.random()}>
-                <td className="px-6 py-4">{user.name || 'N/A'}</td>
-                <td className="px-6 py-4">{user.email || 'N/A'}</td>
-                <td className="px-6 py-4">{user.role || 'user'}</td>
-                <td className="px-6 py-4">{user.phone || 'N/A'}</td>
+      <>
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 font-medium text-gray-500">Name</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Email</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Role</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Phone</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {paginatedUsers.map((user) => (
+                <tr key={user._id || Math.random()}>
+                  <td className="px-6 py-4">{user.name || 'N/A'}</td>
+                  <td className="px-6 py-4">{user.email || 'N/A'}</td>
+                  <td className="px-6 py-4">{user.role || 'user'}</td>
+                  <td className="px-6 py-4">{user.phone || 'N/A'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <PaginationControls 
+          currentPage={currentPage} 
+          totalPages={totalPagesUsers}
+          itemCount={paginatedUsers.length}
+          totalCount={filteredUsers.length}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </>
     );
   };
 
@@ -894,116 +1003,138 @@ const AdminDashboard = () => {
     if (filteredCategories.length === 0)
       return <div className="text-center py-12 text-gray-500">No categories found</div>;
     return (
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h3 className="font-serif text-lg">Categories</h3>
-        </div>
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 font-medium text-gray-500">Name</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredCategories.map((cat) => (
-              <tr key={cat._id || Math.random()}>
-                <td className="px-6 py-4">{cat.name || 'N/A'}</td>
-                <td className="px-6 py-4">
-                  <button
-                    onClick={() => handleCategoryDelete(cat._id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <FaTrash />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
-  const renderContactTable = () => (
-    <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="p-4 border-b justify-between items-center flex">
-        <h3 className="font-serif text-lg">Contact Messages</h3>
-        <button
-          onClick={fetchData}
-          className="text-sm text-rose-500 hover:underline"
-          disabled={loading}
-        >
-          Refresh
-        </button>
-      </div>
-      {loading ? (
-        <div className="flex justify-center py-12">Loading contacts...</div>
-      ) : filteredContacts.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          {searchInput !== '' || Object.values(filters).some(f => f !== '') 
-            ? 'No contacts match your filters' 
-            : 'No contact messages yet.'}
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
+      <>
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="font-serif text-lg">Categories</h3>
+          </div>
           <table className="w-full text-left">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 font-medium text-gray-500">Name</th>
-                <th className="px-6 py-3 font-medium text-gray-500">Email</th>
-                <th className="px-6 py-3 font-medium text-gray-500">Subject</th>
-                <th className="px-6 py-3 font-medium text-gray-500">Message</th>
-                <th className="px-6 py-3 font-medium text-gray-500">Status</th>
-                <th className="px-6 py-3 font-medium text-gray-500">Created At</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredContacts.map((contact) => (
-                <tr key={contact._id || Math.random()}>
-                  <td className="px-6 py-4">{contact.name || 'N/A'}</td>
-                  <td className="px-6 py-4">{contact.email || 'N/A'}</td>
-                  <td className="px-6 py-4">{contact.subject || '-'}</td>
-                  <td className="px-6 py-4 max-w-xs">
-                    <div className="text-sm text-gray-800">
-                      <p className="line-clamp-3">{contact.message || ''}</p>
-                      {contact.message && contact.message.length > 120 && (
-                        <button
-                          type="button"
-                          onClick={() => openContactModal(contact)}
-                          className="mt-1 text-xs text-rose-500 hover:underline"
-                        >
-                          View full
-                        </button>
-                      )}
-                    </div>
-                  </td>
+              {paginatedCategories.map((cat) => (
+                <tr key={cat._id || Math.random()}>
+                  <td className="px-6 py-4">{cat.name || 'N/A'}</td>
                   <td className="px-6 py-4">
-                    <select
-                      value={contact.status || 'New'}
-                      onChange={(e) =>
-                        handleContactStatusChange(contact._id, e.target.value)
-                      }
-                      className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-rose-500 focus:border-rose-500"
+                    <button
+                      onClick={() => handleCategoryDelete(cat._id)}
+                      className="text-red-600 hover:text-red-800"
                     >
-                      <option value="New">New</option>
-                      <option value="Read">Read</option>
-                      <option value="Replied">Replied</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {contact.createdAt
-                      ? new Date(contact.createdAt).toLocaleString()
-                      : 'N/A'}
+                      <FaTrash />
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
-    </div>
-  );
+        <PaginationControls 
+          currentPage={currentPage} 
+          totalPages={totalPagesCategories}
+          itemCount={paginatedCategories.length}
+          totalCount={filteredCategories.length}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </>
+    );
+  };
+
+  const renderContactTable = () => {
+    if (loading) {
+      return <div className="flex justify-center py-12">Loading contacts...</div>;
+    }
+    if (filteredContacts.length === 0) {
+      return (
+        <div className="text-center py-12 text-gray-500">
+          {searchInput !== '' || Object.values(filters).some(f => f !== '') 
+            ? 'No contacts match your filters' 
+            : 'No contact messages yet.'}
+        </div>
+      );
+    }
+    return (
+      <>
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="p-4 border-b justify-between items-center flex">
+            <h3 className="font-serif text-lg">Contact Messages</h3>
+            <button
+              onClick={fetchData}
+              className="text-sm text-rose-500 hover:underline"
+              disabled={loading}
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 font-medium text-gray-500">Name</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">Email</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">Subject</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">Message</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">Status</th>
+                  <th className="px-6 py-3 font-medium text-gray-500">Created At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {paginatedContacts.map((contact) => (
+                  <tr key={contact._id || Math.random()}>
+                    <td className="px-6 py-4">{contact.name || 'N/A'}</td>
+                    <td className="px-6 py-4">{contact.email || 'N/A'}</td>
+                    <td className="px-6 py-4">{contact.subject || '-'}</td>
+                    <td className="px-6 py-4 max-w-xs">
+                      <div className="text-sm text-gray-800">
+                        <p className="line-clamp-3">{contact.message || ''}</p>
+                        {contact.message && contact.message.length > 120 && (
+                          <button
+                            type="button"
+                            onClick={() => openContactModal(contact)}
+                            className="mt-1 text-xs text-rose-500 hover:underline"
+                          >
+                            View full
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <select
+                        value={contact.status || 'New'}
+                        onChange={(e) =>
+                          handleContactStatusChange(contact._id, e.target.value)
+                        }
+                        className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-rose-500 focus:border-rose-500"
+                      >
+                        <option value="New">New</option>
+                        <option value="Read">Read</option>
+                        <option value="Replied">Replied</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {contact.createdAt
+                        ? new Date(contact.createdAt).toLocaleString()
+                        : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <PaginationControls 
+          currentPage={currentPage} 
+          totalPages={totalPagesContacts}
+          itemCount={paginatedContacts.length}
+          totalCount={filteredContacts.length}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </>
+    );
+  };
 
   const renderOrdersTable = () => {
     if (loading) {
@@ -1021,131 +1152,140 @@ const AdminDashboard = () => {
       );
     }
     return (
-      <div className="bg-white shadow rounded-lg overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 font-medium text-gray-500">Order ID</th>
-              <th className="px-6 py-3 font-medium text-gray-500">User</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Products</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Date</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Total</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Status</th>
-              <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredOrders.map((order) => (
-              <tr key={order._id || Math.random()}>
-                <td className="px-6 py-4 font-mono text-sm">
-                  {order._id?.substring(0, 8) || 'N/A'}...
-                </td>
-                <td className="px-6 py-4">{order.user?.name || 'Unknown'}</td>
-                
-                <td className="px-6 py-4">
-                  <div className="text-sm space-y-1">
-                    {order.items && order.items.length > 0 ? (
-                      order.items.map((item, idx) => (
-                        <div key={idx} className="text-gray-700">
-                          <span className="font-medium">
-                            {item.name || item.product?.name || 'Product'}
-                          </span>
-                          <span className="text-gray-500"> × {item.quantity}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="text-gray-400">No items</span>
-                    )}
-                  </div>
-                </td>
-
-                <td className="px-6 py-4">
-                  {order.createdAt
-                    ? new Date(order.createdAt).toLocaleDateString()
-                    : 'N/A'}
-                </td>
-                <td className="px-6 py-4">INR {order.totalPrice || 0}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      order.status === 'delivered'
-                        ? 'bg-green-100 text-green-700'
-                        : order.status === 'shipped'
-                        ? 'bg-blue-100 text-blue-700'
-                        : order.status === 'processing'
-                        ? 'bg-purple-100 text-purple-700'
-                        : order.status === 'cancelled'
-                        ? 'bg-red-100 text-red-700'
-                        : order.status === 'exchange_requested'
-                        ? 'bg-orange-100 text-orange-700'
-                        : order.status === 'exchange_approved'
-                        ? 'bg-teal-100 text-teal-700'
-                        : order.status === 'exchanged'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}
-                  >
-                    {order.status
-                      ? order.status
-                          .replace('_', ' ')
-                          .split(' ')
-                          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                          .join(' ')
-                      : 'Unknown'}
-                  </span>
-                  {order.exchangeReason && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Reason: {order.exchangeReason.replace('_', ' ')}
-                    </p>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    {order.status === 'exchange_requested' ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleExchangeApproval(order._id, true)}
-                          className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors flex items-center gap-1"
-                        >
-                          <FaCheck /> Approve
-                        </button>
-                        <button
-                          onClick={() => handleExchangeApproval(order._id, false)}
-                          className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <FaTimes /> Reject
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        {order.status !== 'cancelled' && order.status !== 'exchanged' && (
-                          <select
-                            value={order.status || 'pending'}
-                            onChange={(e) => handleOrderStatus(order._id, e.target.value)}
-                            className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-rose-500 focus:border-rose-500"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="processing">Processing</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                          </select>
-                        )}
-                        <button
-                          onClick={() => openOrderEditModal(order)}
-                          className="p-2 text-gray-600 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                          title="Edit Order Details"
-                        >
-                          <FaEdit />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </td>
+      <>
+        <div className="bg-white shadow rounded-lg overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 font-medium text-gray-500">Order ID</th>
+                <th className="px-6 py-3 font-medium text-gray-500">User</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Products</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Date</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Total</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Status</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {paginatedOrders.map((order) => (
+                <tr key={order._id || Math.random()}>
+                  <td className="px-6 py-4 font-mono text-sm">
+                    {order._id?.substring(0, 8) || 'N/A'}...
+                  </td>
+                  <td className="px-6 py-4">{order.user?.name || 'Unknown'}</td>
+                  
+                  <td className="px-6 py-4">
+                    <div className="text-sm space-y-1">
+                      {order.items && order.items.length > 0 ? (
+                        order.items.map((item, idx) => (
+                          <div key={idx} className="text-gray-700">
+                            <span className="font-medium">
+                              {item.name || item.product?.name || 'Product'}
+                            </span>
+                            <span className="text-gray-500"> × {item.quantity}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-gray-400">No items</span>
+                      )}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-4">
+                    {order.createdAt
+                      ? new Date(order.createdAt).toLocaleDateString()
+                      : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4">INR {order.totalPrice || 0}</td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        order.status === 'delivered'
+                          ? 'bg-green-100 text-green-700'
+                          : order.status === 'shipped'
+                          ? 'bg-blue-100 text-blue-700'
+                          : order.status === 'processing'
+                          ? 'bg-purple-100 text-purple-700'
+                          : order.status === 'cancelled'
+                          ? 'bg-red-100 text-red-700'
+                          : order.status === 'exchange_requested'
+                          ? 'bg-orange-100 text-orange-700'
+                          : order.status === 'exchange_approved'
+                          ? 'bg-teal-100 text-teal-700'
+                          : order.status === 'exchanged'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {order.status
+                        ? order.status
+                            .replace('_', ' ')
+                            .split(' ')
+                            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                            .join(' ')
+                        : 'Unknown'}
+                    </span>
+                    {order.exchangeReason && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Reason: {order.exchangeReason.replace('_', ' ')}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      {order.status === 'exchange_requested' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleExchangeApproval(order._id, true)}
+                            className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors flex items-center gap-1"
+                          >
+                            <FaCheck /> Approve
+                          </button>
+                          <button
+                            onClick={() => handleExchangeApproval(order._id, false)}
+                            className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
+                          >
+                            <FaTimes /> Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {order.status !== 'cancelled' && order.status !== 'exchanged' && (
+                            <select
+                              value={order.status || 'pending'}
+                              onChange={(e) => handleOrderStatus(order._id, e.target.value)}
+                              className="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-rose-500 focus:border-rose-500"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="processing">Processing</option>
+                              <option value="shipped">Shipped</option>
+                              <option value="delivered">Delivered</option>
+                            </select>
+                          )}
+                          <button
+                            onClick={() => openOrderEditModal(order)}
+                            className="p-2 text-gray-600 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title="Edit Order Details"
+                          >
+                            <FaEdit />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <PaginationControls 
+          currentPage={currentPage} 
+          totalPages={totalPagesOrders}
+          itemCount={paginatedOrders.length}
+          totalCount={filteredOrders.length}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </>
     );
   };
 
@@ -1160,7 +1300,10 @@ const AdminDashboard = () => {
             className={`px-6 py-3 font-medium capitalize whitespace-nowrap ${
               activeTab === tab ? 'border-b-2 border-rose-500 text-rose-500' : 'text-gray-500'
             }`}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab);
+              setCurrentPage(1);
+            }}
           >
             {tab}
           </button>
@@ -1189,7 +1332,14 @@ const AdminDashboard = () => {
 
       {activeTab === 'categories' && <div>{renderCategoriesTable()}</div>}
 
-      {activeTab === 'contact' && renderContactTable()}
+      {activeTab === 'contact' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-serif">Contact Management</h2>
+          </div>
+          {renderContactTable()}
+        </div>
+      )}
 
       {activeTab === 'orders' && (
         <div className="space-y-6">
@@ -1207,6 +1357,7 @@ const AdminDashboard = () => {
         </div>
       )}
 
+      {/* MODALS */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
           <div className="bg-white p-8 rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
@@ -1283,7 +1434,7 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Upload Images (Click to add from Cloudinary)
+                  Upload Images
                 </label>
                 <div className="flex gap-2 mb-2">
                    <input
@@ -1327,7 +1478,7 @@ const AdminDashboard = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Style Collections (Select multiple)
+                  Style Collections
                 </label>
                 <div className="grid grid-cols-2 gap-4 mb-4 p-4 border rounded-lg bg-gray-50">
                   {['minimalist', 'boho', 'everyday', 'accent'].map((style) => (
@@ -1355,7 +1506,7 @@ const AdminDashboard = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Paired Products (Product Names or IDs, comma separated)
+                  Paired Products (comma separated)
                 </label>
                 <input
                   type="text"
