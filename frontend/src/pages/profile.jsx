@@ -466,7 +466,7 @@ const Profile = () => {
                             <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden">
                               {item.product?.images?.[0] && (  
 
-                                <img src={item.product.images} alt={item.product.name} className="w-full h-full object-cover" />
+                                <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
                               )}
                             </div>
                             <div className="flex-1">
