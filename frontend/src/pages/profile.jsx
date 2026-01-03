@@ -527,7 +527,7 @@ const Profile = () => {
                   {wishlist.map((item) => (
                     <div key={item._id} className="bg-white rounded-lg overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                       <div className="h-48 bg-gray-100 relative group">
-                        <img src={item.images?. || 'https://via.placeholder.com/150'} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.images?.[0] || 'https://via.placeholder.com/150'} alt={item.name} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <button onClick={() => navigate(`/product/${item._id}`)} className="bg-white text-gray-900 px-4 py-2 rounded-full text-sm font-medium hover:bg-rose-500 hover:text-white transition-colors">
                             View Details
