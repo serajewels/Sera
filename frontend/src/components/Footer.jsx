@@ -21,11 +21,11 @@ const Footer = () => {
           </div>
           {/* Social Icons Row */}
           <div className="flex items-center gap-4 pt-4">
-            <a href="https://instagram.com/serajewelry" target="_blank" rel="noopener noreferrer" 
+            <a href="https://www.instagram.com/jewelsbysera" target="_blank" rel="noopener noreferrer" 
                className="group" aria-label="Instagram">
               <FaInstagram className="w-6 h-6 text-gray-900 group-hover:text-rose-600 transition-colors duration-300 hover:scale-110" />
             </a>
-            <a href="https://pinterest.com/serajewelry" target="_blank" rel="noopener noreferrer" 
+            <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" 
                className="group" aria-label="Pinterest">
               <FaPinterest className="w-6 h-6 text-gray-900 group-hover:text-rose-600 transition-colors duration-300 hover:scale-110" />
             </a>
