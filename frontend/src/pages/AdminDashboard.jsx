@@ -42,7 +42,7 @@ const AdminDashboard = () => {
   
   const fetchAllProducts = async () => {
     try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?limit=1000`);
       setAllProducts(
         Array.isArray(data?.products) 
           ? data.products 

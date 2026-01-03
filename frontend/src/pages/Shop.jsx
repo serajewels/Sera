@@ -27,7 +27,7 @@ const Shop = () => {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products`);
+      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?limit=1000`);
       const safeProducts = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
       setProducts(safeProducts);
       setFilteredProducts(safeProducts);
