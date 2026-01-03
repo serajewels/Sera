@@ -73,7 +73,7 @@ const Footer = () => {
               </p>
               <div>
                 <h4 className="font-semibold text-rose-600 mb-2 tracking-wide uppercase text-xs">Instagram</h4>
-                <a href="https://instagram.com/serajewelry" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-rose-600 transition-colors">
+                <a href="https://www.instagram.com/jewelsbysera" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-rose-600 transition-colors">
                   <FaInstagram className="w-4 h-4" />
                   <span>Follow us</span>
                 </a>

@@ -825,7 +825,7 @@ const AdminDashboard = () => {
               <tr key={product._id || Math.random()}>
                 <td className="px-6 py-4">{product.name || 'Unnamed Product'}</td>
                 <td className="px-6 py-4">{product.category || 'N/A'}</td>
-                <td className="px-6 py-4">INR{product.price || 0}</td>
+                <td className="px-6 py-4">INR {product.price || 0}</td>
                 <td className="px-6 py-4">{product.stock || 0}</td>
                 <td className="px-6 py-4 flex gap-4">
                   <button
@@ -1066,7 +1066,7 @@ const AdminDashboard = () => {
                 ? new Date(order.createdAt).toLocaleDateString()
                 : 'N/A'}
             </td>
-            <td className="px-6 py-4">INR{order.totalPrice || 0}</td>
+            <td className="px-6 py-4">INR {order.totalPrice || 0}</td>
             <td className="px-6 py-4">
               <span
                 className={`px-3 py-1 rounded-full text-xs font-medium ${

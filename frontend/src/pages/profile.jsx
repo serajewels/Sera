@@ -100,7 +100,7 @@ const Profile = () => {
         },
       };
       const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/cancel`, {}, config);
-      alert(`Order cancelled successfully. ${data.cancellationFee > 0 ? `Cancellation fee: INR${data.cancellationFee}` : 'No cancellation fee.'} Refund: INR${data.refundAmount}`);
+      alert(`Order cancelled successfully. ${data.cancellationFee > 0 ? `Cancellation fee: INR ${data.cancellationFee}` : 'No cancellation fee.'} Refund: INR ${data.refundAmount}`);
       fetchProfile();
     } catch (error) {
       console.error('Error cancelling order:', error);
@@ -121,7 +121,7 @@ const Profile = () => {
         },
       };
       const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrderId}/exchange`, { reason: exchangeReason }, config);
-      alert(`Exchange requested successfully. ${data.exchangeFee > 0 ? `Exchange fee: INR${data.exchangeFee}` : 'Free exchange (damaged/defective item)'}`);
+      alert(`Exchange requested successfully. ${data.exchangeFee > 0 ? `Exchange fee: INR ${data.exchangeFee}` : 'Free exchange (damaged/defective item)'}`);
       setExchangeModalOpen(false);
       setExchangeReason('');
       fetchProfile();
@@ -378,7 +378,7 @@ const Profile = () => {
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 uppercase tracking-wider">Total</p>
-                          <p className="font-medium text-gray-900">INR{order.totalPrice}</p>
+                          <p className="font-medium text-gray-900">INR {order.totalPrice}</p>
                         </div>
                         <div>
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -408,7 +408,7 @@ const Profile = () => {
                               <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                             </div>
                             <div className="text-right">
-                              <p className="font-medium text-gray-900">INR{item.price}</p>
+                              <p className="font-medium text-gray-900">INR {item.price}</p>
                             </div>
                           </div>
                         ))}
@@ -420,7 +420,7 @@ const Profile = () => {
                               onClick={() => handleCancelOrder(order._id)}
                               className="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600 transition-colors"
                             >
-                              Cancel Order {order.status === 'processing' ? '(INR100 fee)' : ''}
+                              Cancel Order {order.status === 'processing' ? '(INR 100 fee)' : ''}
                             </button>
                           )}
                           {canExchangeOrder(order) && (
@@ -438,7 +438,7 @@ const Profile = () => {
                             <p className="text-sm text-orange-600 italic">Exchange request pending admin approval...</p>
                           )}
                           {order.status === 'cancelled' && order.cancellationFee > 0 && (
-                            <p className="text-sm text-gray-600">Cancellation Fee: INR{order.cancellationFee} | Refund: INR{order.refundAmount}</p>
+                            <p className="text-sm text-gray-600">Cancellation Fee: INR {order.cancellationFee} | Refund: INR {order.refundAmount}</p>
                           )}
                         </div>
                       </div>
@@ -470,7 +470,7 @@ const Profile = () => {
                       </div>
                       <div className="p-4">
                         <h3 className="font-serif text-lg text-gray-900 truncate">{item.name}</h3>
-                        <p className="text-rose-600 font-medium mt-1">INR{item.price}</p>
+                        <p className="text-rose-600 font-medium mt-1">INR {item.price}</p>
                       </div>
                     </div>
                   ))}
@@ -571,8 +571,8 @@ const Profile = () => {
               <option value="">-- Select Reason --</option>
               <option value="damaged">Received Damaged/ Defective Product (Free Exchange)</option>
               <option value="wrong_item">Wrong Item Received (Free Exchange)</option>
-              <option value="changed_mind">Changed My Mind (INR100 fee)</option>
-              <option value="other"> Others (INR100 fee)</option>
+              <option value="changed_mind">Changed My Mind (INR 100 fee)</option>
+              <option value="other"> Others (INR 100 fee)</option>
               
             </select>
             <p className="text-xs text-gray-500 mb-6">

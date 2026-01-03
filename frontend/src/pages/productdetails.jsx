@@ -288,7 +288,7 @@ const ProductDetails = () => {
           <div className="flex items-start gap-6">
             <div className="flex-1">
               <p className="text-4xl font-serif font-light text-gray-900">
-                INR{product.price?.toLocaleString()}
+                INR {product.price?.toLocaleString()}
               </p>
               {product.stock === 0 && (
                 <span className="ml-4 px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-sm font-medium">
@@ -406,7 +406,7 @@ const ProductDetails = () => {
                     </div>
                     <h4 className="font-medium text-gray-900 truncate">{pair.name}</h4>
                     <p className="text-sm text-rose-500 font-medium mt-1">
-                      INR{pair.price?.toLocaleString()}
+                      INR {pair.price?.toLocaleString()}
                     </p>
                   </div>
                 ))}

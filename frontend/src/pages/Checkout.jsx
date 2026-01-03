@@ -185,7 +185,7 @@ const Checkout = () => {
                        <span className="text-gray-500">{item.quantity}x</span>
                        <span className="truncate max-w-[150px]">{item.product.name}</span>
                     </div>
-                    <span>INR{item.quantity * item.product.price}</span>
+                    <span>INR {item.quantity * item.product.price}</span>
                   </div>
                 ))}
               </div>
@@ -193,15 +193,15 @@ const Checkout = () => {
               <div className="border-t border-gray-300 pt-4 space-y-2">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>INR{subtotal}</span>
+                  <span>INR {subtotal}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span>{shipping === 0 ? 'Free' : `INR${shipping}`}</span>
+                  <span>{shipping === 0 ? 'Free' : `INR ${shipping}`}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg pt-2">
                   <span>Total</span>
-                  <span>INR{total}</span>
+                  <span>INR {total}</span>
                 </div>
               </div>
 
