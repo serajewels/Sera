@@ -34,8 +34,10 @@ const userSchema = new mongoose.Schema({
     street: String,
     city: String,
     state: String,
-    pincode: String,
+    postalCode: String,      // ✅ FIXED: Changed from 'pincode' to 'postalCode'
     country: { type: String, default: 'India' },
+    phone: String,           // ✅ ADDED: Allow per-address phone (optional)
+    landmark: String,        // ✅ ADDED: Landmark field
     isDefault: { type: Boolean, default: false }
   }],
   isActive: { 
