@@ -1,6 +1,7 @@
 import { FaInstagram, FaPinterest } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 
+
 const Footer = () => {
   return (
     <footer className="bg-rose-50 pt-16 pb-8 px-6 md:px-12 text-gray-900 border-t border-rose-200">
@@ -32,8 +33,9 @@ const Footer = () => {
           </div>
         </div>
 
+
         {/* Right Section: Links */}
-        <div className="md:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-8 md:pl-12 border-l border-rose-200">
+        <div className="md:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-8 md:pl-12">
           
           {/* Quick Links */}
           <div className="space-y-6">
@@ -46,6 +48,7 @@ const Footer = () => {
             </ul>
           </div>
 
+
           {/* Explore */}
           <div className="space-y-6">
             <h3 className="font-bold tracking-widest uppercase text-sm text-rose-600">Explore</h3>
@@ -55,6 +58,7 @@ const Footer = () => {
               <li><Link to="/faq" className="hover:text-rose-600 transition-colors group flex items-center gap-2 hover:gap-3">FAQ's <span className="w-1 h-1 bg-rose-600 rounded-full scale-0 group-hover:scale-100 transition-all duration-300"></span></Link></li>
             </ul>
           </div>
+
 
           {/* Contact Info */}
           <div className="space-y-6">
@@ -86,6 +90,7 @@ const Footer = () => {
         </div>
       </div>
 
+
       {/* Bottom Bar */}
       <div className="container mx-auto mt-16 pt-12 border-t border-rose-200">
         <div className="flex flex-col md:flex-row justify-between items-center text-xs tracking-widest text-gray-600 gap-6 md:gap-0">
@@ -99,5 +104,6 @@ const Footer = () => {
     </footer>
   );
 };
+
 
 export default Footer;
