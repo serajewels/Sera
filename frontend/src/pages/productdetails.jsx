@@ -535,7 +535,7 @@ const ProductDetails = () => {
             <div className="flex flex-col">
               <span className="font-medium text-gray-700">Product ID:</span>
               <code className="font-mono bg-gray-100 px-2 py-1 rounded text-xs mt-1">
-                {product._id?.substring(0, 11)}...
+                {product._id?.substring(0, 11)}
               </code>
             </div>
             <div>
