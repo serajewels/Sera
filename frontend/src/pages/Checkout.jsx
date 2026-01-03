@@ -55,7 +55,7 @@ const Checkout = () => {
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress) {
-      alert('Please select or add a shipping address.');
+      toast.error('Please select or add a shipping address.');
       return;
     }
 
@@ -98,7 +98,7 @@ const Checkout = () => {
       navigate('/order-success');
     } catch (error) {
       console.error('Error placing order:', error);
-      alert('Failed to place order.');
+      toast.error('Failed to place order.');
     }
   };
 

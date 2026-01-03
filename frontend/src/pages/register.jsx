@@ -62,7 +62,7 @@ const Register = () => {
 
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/resend-otp`, { email });
-      alert('OTP resent successfully! Check your email.');
+      toast.success('OTP resent successfully! Check your email.');
       setLoading(false);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to resend OTP');

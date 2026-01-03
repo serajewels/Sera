@@ -87,7 +87,7 @@ const Profile = () => {
       setAddresses(data.addresses);
     } catch (error) {
       console.error('Error updating addresses:', error);
-      alert('Failed to update addresses');
+      toast.error('Failed to update addresses');
     }
   };
 
@@ -101,17 +101,17 @@ const Profile = () => {
         },
       };
       const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/cancel`, {}, config);
-      alert(`Order cancelled successfully. ${data.cancellationFee > 0 ? `Cancellation fee: INR ${data.cancellationFee}` : 'No cancellation fee.'} Refund: INR ${data.refundAmount}`);
+      toast.success(`Order cancelled successfully. ${data.cancellationFee > 0 ? `Cancellation fee: INR ${data.cancellationFee}` : 'No cancellation fee.'} Refund: INR ${data.refundAmount}`);
       fetchProfile();
     } catch (error) {
       console.error('Error cancelling order:', error);
-      alert(error.response?.data?.message || 'Failed to cancel order');
+      toast.error(error.response?.data?.message || 'Failed to cancel order');
     }
   };
 
   const handleExchangeRequest = async () => {
     if (!exchangeReason) {
-      alert('Please select a reason for exchange');
+      toast.error('Please select a reason for exchange');
       return;
     }
 
@@ -122,13 +122,13 @@ const Profile = () => {
         },
       };
       const { data } = await axios.put(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrderId}/exchange`, { reason: exchangeReason }, config);
-      alert(`Exchange requested successfully. ${data.exchangeFee > 0 ? `Exchange fee: INR ${data.exchangeFee}` : 'Free exchange (damaged/defective item)'}`);
+      toast.success(`Exchange requested successfully. ${data.exchangeFee > 0 ? `Exchange fee: INR ${data.exchangeFee}` : 'Free exchange (damaged/defective item)'}`);
       setExchangeModalOpen(false);
       setExchangeReason('');
       fetchProfile();
     } catch (error) {
       console.error('Error requesting exchange:', error);
-      alert(error.response?.data?.message || 'Failed to request exchange');
+      toast.error(error.response?.data?.message || 'Failed to request exchange');
     }
   };
 
