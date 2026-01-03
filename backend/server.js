@@ -59,6 +59,15 @@ const path = require('path');
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'public/static/uploads')));
 
+// ✅ ADD THIS - Health Check Endpoint
+app.get('/api/healthcheck', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'SERA backend is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.stack);
