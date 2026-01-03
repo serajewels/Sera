@@ -41,7 +41,7 @@ const Checkout = () => {
         setAddresses(profileRes.data.addresses || []);
         
         if (profileRes.data.addresses && profileRes.data.addresses.length > 0) {
-          setSelectedAddress(profileRes.data.addresses);
+          setSelectedAddress(profileRes.data.addresses[0]);
         }
         
         setLoading(false);
