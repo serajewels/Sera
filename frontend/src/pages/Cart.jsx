@@ -148,7 +148,7 @@ const Cart = () => {
                     {item.product?.category || 'Uncategorized'}
                   </p>
                   <p className="font-medium text-rose-600">
-                    Rs. {item.product?.price || 0}
+                    INR{item.product?.price || 0}
                   </p>
                 </div>
 
@@ -190,20 +190,20 @@ const Cart = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>Rs. {subtotal}</span>
+                  <span>INR{subtotal}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span>{shipping === 0 ? 'Free' : `Rs. ${shipping}`}</span>
+                  <span>{shipping === 0 ? 'Free' : `INR${shipping}`}</span>
                 </div>
                 {shipping > 0 && subtotal > 0 && (
                   <p className="text-xs text-rose-500">
-                    Add Rs. {Math.max(0, 1000 - subtotal)} more for free shipping
+                    Add INR{Math.max(0, 1000 - subtotal)} more for free shipping
                   </p>
                 )}
                 <div className="border-t border-gray-300 pt-4 flex justify-between font-bold text-lg">
                   <span>Total</span>
-                  <span>Rs. {total}</span>
+                  <span>INR{total}</span>
                 </div>
               </div>
               <button

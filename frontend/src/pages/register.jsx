@@ -188,7 +188,7 @@ const Register = () => {
               )}
 
               <div className="mt-8 text-center text-sm text-gray-600">
-                <p>Already have an account? <Link to="/login" className="text-[#c5a666] font-semibold hover:underline">Sign in</Link></p>
+                <p>Already have an account? <Link to="/login" className="text-[#c5a666] font-semibold hover:underline">Log in</Link></p>
               </div>
             </motion.div>
           </div>

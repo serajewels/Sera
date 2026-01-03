@@ -44,7 +44,7 @@ const Login = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="text-4xl font-serif text-gray-900 text-center mb-2">Sign In</h2>
+            <h2 className="text-4xl font-serif text-gray-900 text-center mb-2">Log In</h2>
             <p className="text-gray-500 text-center mb-8 font-light">Access your personal jewelry collection</p>
             
             {error && <div className="bg-red-50 text-red-600 p-3 rounded mb-6 text-sm text-center border border-red-100">{error}</div>}
@@ -72,7 +72,7 @@ const Login = () => {
                 </div>
                 
                 <button type="submit" className="w-full bg-[#c5a666] text-white py-3 rounded uppercase tracking-widest font-medium hover:bg-[#b09458] transition-colors duration-300 shadow-md hover:shadow-lg">
-                    Sign In
+                    Log In
                 </button>
             </form>
 

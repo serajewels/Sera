@@ -281,7 +281,7 @@ const Shop = () => {
             </p>
             <div className="flex items-center justify-center gap-2">
               <p className="text-lg md:text-xl font-medium text-gray-900">
-                Rs. {product.price?.toLocaleString() || 0}
+                INR{product.price?.toLocaleString() || 0}
               </p>
               {product.stock > 0 && product.stock <= 5 && (
                 <span className="text-xs text-orange-500 font-medium">

@@ -67,7 +67,7 @@ const ForgotPassword = () => {
           </form>
 
           <div className="mt-8 text-center text-sm text-gray-600">
-            <p>Remember your password? <Link to="/login" className="text-[#c5a666] font-semibold hover:underline">Sign In</Link></p>
+            <p>Remember your password? <Link to="/login" className="text-[#c5a666] font-semibold hover:underline">Log In</Link></p>
           </div>
         </motion.div>
       </div>
