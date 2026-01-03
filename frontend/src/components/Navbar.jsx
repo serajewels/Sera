@@ -82,17 +82,18 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Center: Logo - With small gap from top */}
             <Link 
-              to="/" 
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[calc(55%-8px)] z-20"
-            >
-              <img 
-                src="/logo.png" 
-                alt="SERA Logo" 
-                className="h-24 md:h-28 lg:h-32 xl:h-36 w-auto object-contain transition-opacity duration-300 hover:opacity-80" 
-              />
-            </Link>
+  to="/" 
+  className="absolute left-[calc(50%-54px)] md:left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 md:-translate-y-[calc(54%-8px)] z-20"
+>
+  <img 
+    src="/logo.png" 
+    alt="SERA Logo" 
+    className="h-[120px] md:h-28 lg:h-32 xl:h-36 w-auto object-contain transition-opacity duration-300 hover:opacity-80" 
+  />
+</Link>
+
+
 
             {/* Right: Icons */}
             <div className="flex items-center space-x-6 text-xl z-10 relative">
