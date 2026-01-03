@@ -11,8 +11,8 @@ const AdminDashboard = () => {
   const [contacts, setContacts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false); // For Product Modal
-  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false); // For Order Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
   const [orderForm, setOrderForm] = useState({
@@ -29,7 +29,6 @@ const AdminDashboard = () => {
   const [selectedContact, setSelectedContact] = useState(null);
   const navigate = useNavigate();
 
-  // All products for dropdown in order edit
   const [allProducts, setAllProducts] = useState([]);
   
   const fetchAllProducts = async () => {
@@ -47,23 +46,20 @@ const AdminDashboard = () => {
     }
   };
 
-  // Form State
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     category: 'NECKLACE',
     stock: '',
     description: '',
-    images: '',
-    selectedStyles: [], // Array for multiple styles
+    images: [],
+    selectedStyles: [],
     accentPairs: '',
   });
 
-  // Helper to convert Google Drive links to direct image links
   const convertDriveLink = (link) => {
     try {
       if (link.includes('drive.google.com')) {
-        // Extract ID
         let id = '';
         const parts = link.split('/');
         if (link.includes('/file/d/')) {
@@ -77,9 +73,7 @@ const AdminDashboard = () => {
         }
 
         if (id) {
-          // Clean ID
           id = id.split('?')[0].split('&')[0];
-          // Use the 'uc' export link which is standard for direct viewing
           return `https://drive.google.com/uc?export=view&id=${id}`;
         }
       }
@@ -89,9 +83,8 @@ const AdminDashboard = () => {
     }
   };
 
-  // Filter States - Split search into two states
-  const [searchInput, setSearchInput] = useState(''); // For input field
-  const [debouncedSearch, setDebouncedSearch] = useState(''); // For actual filtering
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimeoutRef = useRef(null);
 
   const [filters, setFilters] = useState({
@@ -105,7 +98,6 @@ const AdminDashboard = () => {
     dateTo: '',
   });
 
-  // Debounce search input
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -113,7 +105,7 @@ const AdminDashboard = () => {
 
     searchTimeoutRef.current = setTimeout(() => {
       setDebouncedSearch(searchInput);
-    }, 300); // 300ms delay
+    }, 300);
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -127,7 +119,6 @@ const AdminDashboard = () => {
     return stored ? JSON.parse(stored) : null;
   };
 
-  // Filter functions - Use debouncedSearch instead of filters.search
   const filterProducts = useCallback((products) => {
     return products.filter((product) => {
       const matchesSearch = !debouncedSearch || 
@@ -198,7 +189,6 @@ const AdminDashboard = () => {
     });
   }, [debouncedSearch, filters]);
 
-  // Memoized filtered data
   const filteredProducts = useMemo(() => filterProducts(products), [products, filterProducts]);
   const filteredUsers = useMemo(() => filterUsers(users), [users, filterUsers]);
   const filteredContacts = useMemo(() => filterContacts(contacts), [contacts, filterContacts]);
@@ -336,7 +326,7 @@ const AdminDashboard = () => {
       },
       status: order.status || 'pending',
       items: order.items.map(item => ({
-        product: item.product?._id || item.product || '', // handle populated or ID
+        product: item.product?._id || item.product || '',
         quantity: item.quantity || 1
       }))
     });
@@ -347,7 +337,6 @@ const AdminDashboard = () => {
   const handleUpdateOrder = async (e) => {
     e.preventDefault();
 
-    // Validate items
     const validItems = orderForm.items.filter(item => item.product && item.quantity > 0);
     if (validItems.length === 0) {
       alert('Order must have at least one valid item');
@@ -382,6 +371,7 @@ const AdminDashboard = () => {
       alert(error.response?.data?.message || 'Failed to update order');
     }
   };
+
   const handleCategoryDelete = async (id) => {
     if (!window.confirm('Delete this category?')) return;
     try {
@@ -402,12 +392,10 @@ const AdminDashboard = () => {
 
   const handleOpenModal = async (product = null) => {
     if (product) {
-      // Fetch full details to get populated accentPairs (names)
       try {
         const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products/${product._id}`);
         setEditingProduct(data);
         
-        // Determine styles from tags
         const currentTags = data.tags || [];
         const validStyles = ['minimalist', 'boho', 'everyday', 'accent'];
         const foundStyles = currentTags.filter(t => validStyles.includes(t));
@@ -418,14 +406,12 @@ const AdminDashboard = () => {
           category: data.category || 'NECKLACE',
           stock: data.stock || '',
           description: data.description || '',
-          images: data.images ? data.images.join(', ') : '',
+          images: Array.isArray(data.images) ? data.images : [],
           selectedStyles: foundStyles,
-          // Map accentPairs to names if populated, otherwise IDs
           accentPairs: data.accentPairs ? data.accentPairs.map(p => (typeof p === 'object' ? p.name : p)).join(', ') : '',
         });
       } catch (error) {
         console.error("Failed to fetch product details", error);
-        // Fallback to list data
         setEditingProduct(product);
         setFormData({
             name: product.name || '',
@@ -433,8 +419,8 @@ const AdminDashboard = () => {
             category: product.category || 'NECKLACE',
             stock: product.stock || '',
             description: product.description || '',
-            images: product.images ? product.images.join(', ') : '',
-            selectedStyles: [], // basic fallback
+            images: Array.isArray(product.images) ? product.images : [],
+            selectedStyles: [],
             accentPairs: product.accentPairs ? product.accentPairs.join(', ') : '',
         });
       }
@@ -446,7 +432,7 @@ const AdminDashboard = () => {
         category: 'NECKLACE',
         stock: '',
         description: '',
-        images: '',
+        images: [],
         selectedStyles: [],
         accentPairs: '',
       });
@@ -454,6 +440,7 @@ const AdminDashboard = () => {
     setIsModalOpen(true);
   };
 
+  // 🔥 FIXED: Proper Cloudinary image upload
   const uploadFileHandler = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -469,14 +456,18 @@ const AdminDashboard = () => {
         },
       };
 
+      // ✅ FIXED: Access data.url (from backend response)
       const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/upload`, formDataUpload, config);
       
-      // Append the new image URL to the existing images string
-      const fullUrl = `${import.meta.env.VITE_API_URL}${data}`; // Ensure full path if relative
+      // ✅ FIXED: data.url is the Cloudinary secure URL
+      const imageUrl = data.url; // This is directly from Cloudinary
+      
+      // ✅ FIXED: Store as array and append new images
       setFormData(prev => ({
         ...prev,
-        images: prev.images ? `${prev.images}, ${fullUrl}` : fullUrl
+        images: [...prev.images, imageUrl]
       }));
+      
       setUploading(false);
     } catch (error) {
       console.error(error);
@@ -501,6 +492,14 @@ const AdminDashboard = () => {
     }
   };
 
+  // ✅ FIXED: Remove image from preview
+  const removeImage = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const ui = getUserInfo();
@@ -510,7 +509,6 @@ const AdminDashboard = () => {
     }
     const config = { headers: { Authorization: `Bearer ${ui.token}` } };
 
-    // Construct tags from selected styles
     const tags = [...formData.selectedStyles];
 
     const productData = {
@@ -520,8 +518,14 @@ const AdminDashboard = () => {
       stock: parseInt(formData.stock),
       description: formData.description,
       images: formData.images
-        .split(',')
-        .map((img) => convertDriveLink(img.trim())) // Convert Drive links
+        .map((img) => {
+          // If it's already a Cloudinary URL, return as-is
+          if (img.includes('cloudinary.com') || img.includes('drive.google.com')) {
+            return img;
+          }
+          // Otherwise convert if it's a Google Drive link
+          return convertDriveLink(img);
+        })
         .filter((img) => img !== ''),
       tags: tags,
       accentPairs: formData.accentPairs ? formData.accentPairs.split(',').map(id => id.trim()).filter(id => id) : [],
@@ -573,7 +577,6 @@ const AdminDashboard = () => {
     setSelectedContact(null);
   };
 
-  // Filter Controls Component
   const FilterControls = () => {
     const currentTab = activeTab;
     const hasActiveFilters = searchInput !== '' || Object.values(filters).some(f => f !== '');
@@ -653,7 +656,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Advanced Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
           {currentTab === 'products' && (
             <>
@@ -1028,7 +1030,6 @@ const AdminDashboard = () => {
           <th className="px-6 py-3 font-medium text-gray-500">Order ID</th>
           <th className="px-6 py-3 font-medium text-gray-500">User</th>
           <th className="px-6 py-3 font-medium text-gray-500">Products</th>
-         
           <th className="px-6 py-3 font-medium text-gray-500">Date</th>
           <th className="px-6 py-3 font-medium text-gray-500">Total</th>
           <th className="px-6 py-3 font-medium text-gray-500">Status</th>
@@ -1043,7 +1044,6 @@ const AdminDashboard = () => {
             </td>
             <td className="px-6 py-4">{order.user?.name || 'Unknown'}</td>
             
-            {/* Products Column */}
             <td className="px-6 py-4">
               <div className="text-sm space-y-1">
                 {order.items && order.items.length > 0 ? (
@@ -1060,8 +1060,6 @@ const AdminDashboard = () => {
                 )}
               </div>
             </td>
-
-            
 
             <td className="px-6 py-4">
               {order.createdAt
@@ -1151,8 +1149,6 @@ const AdminDashboard = () => {
     </table>
   </div>
 );
-
-
   };
 
   return (
@@ -1289,11 +1285,12 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Image URLs (comma separated)
+                  Upload Images (Click to add from Cloudinary)
                 </label>
                 <div className="flex gap-2 mb-2">
                    <input
                      type="file"
+                     accept="image/*"
                      onChange={uploadFileHandler}
                      className="block w-full text-sm text-gray-500
                        file:mr-4 file:py-2 file:px-4
@@ -1305,36 +1302,30 @@ const AdminDashboard = () => {
                    {uploading && <span className="text-sm text-gray-500 self-center">Uploading...</span>}
                 </div>
                 
-                {/* Image Preview */}
-                {formData.images && (
+                {/* Image Preview - FIXED */}
+                {formData.images && formData.images.length > 0 && (
                   <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
-                    {formData.images.split(',').map((img, index) => {
-                      const trimmedImg = img.trim();
-                      if (!trimmedImg) return null;
-                      const displayUrl = convertDriveLink(trimmedImg);
+                    {formData.images.map((img, index) => {
+                      if (!img) return null;
                       return (
                         <div key={index} className="relative w-24 h-24 flex-shrink-0 border rounded-lg overflow-hidden bg-gray-100">
                           <img 
-                            src={displayUrl} 
+                            src={img} 
                             alt={`Preview ${index}`} 
                             className="w-full h-full object-cover"
                           />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
                         </div>
                       );
                     })}
                   </div>
                 )}
-
-                <textarea
-                  value={formData.images}
-                  onChange={(e) => setFormData({ ...formData, images: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-rose-500 focus:border-rose-500"
-                  rows="3"
-                  placeholder="https://example.com/image1.jpg, https://drive.google.com/..."
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Upload an image above or paste links. Google Drive links will be automatically converted.
-                </p>
               </div>
 
               <div>
@@ -1456,7 +1447,6 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Order Edit Modal */}
       {isOrderModalOpen && editingOrder && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[90]">
           <div className="bg-white p-8 rounded-lg w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
