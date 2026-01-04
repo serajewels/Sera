@@ -157,10 +157,12 @@ const Shop = () => {
   const paginatedProducts = filteredAndPaginatedProducts.slice(startIndex, endIndex);
 
   // ✅ FIXED: Helper function to build query string with page number
-  const buildQueryString = (page = 1) => {
+  // Pass categoryOverride to ensure new category is used immediately (React state is async)
+  const buildQueryString = (page = 1, categoryOverride = null) => {
     const params = new URLSearchParams();
     if (page > 1) params.set('page', page);
-    if (selectedCategory !== 'All') params.set('category', selectedCategory.toLowerCase());
+    const catToUse = categoryOverride !== null ? categoryOverride : selectedCategory;
+    if (catToUse !== 'All') params.set('category', catToUse.toLowerCase());
     if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
     return params.toString();
   };
@@ -174,7 +176,8 @@ const Shop = () => {
     if (category === 'All') {
       navigate('/shop');
     } else {
-      const query = buildQueryString(newPage);
+      // ✅ FIXED: Pass new category to buildQueryString to avoid async state timing issues
+      const query = buildQueryString(newPage, category);
       navigate(`/shop${query ? '?' + query : ''}`);
     }
   };
