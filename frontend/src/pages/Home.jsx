@@ -1,6 +1,51 @@
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+// Lazy load component for images
+const LazyImage = ({ src, alt, className, style }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const imgRef = useRef();
+
+  useEffect(() => {
+    if (!imgRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '50px' }
+    );
+
+    observer.observe(imgRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={imgRef} className={className} style={style}>
+      {isInView && (
+        <>
+          {!isLoaded && (
+            <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+          )}
+          <img
+            src={src}
+            alt={alt}
+            className={`${className} transition-opacity duration-300 ${
+              isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setIsLoaded(true)}
+            loading="lazy"
+          />
+        </>
+      )}
+    </div>
+  );
+};
 
 const HeroSection = () => {
   return (
@@ -17,7 +62,7 @@ const HeroSection = () => {
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 0.5 }}
+          transition={{ duration: 0.8, delay: 0.3 }}
           className="text-5xl md:text-7xl font-serif mb-4 tracking-wide"
         >
           Welcome to Sera
@@ -25,13 +70,12 @@ const HeroSection = () => {
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, delay: 1.0 }}
+          transition={{ duration: 0.8, delay: 0.5 }}
           className="text-lg md:text-2xl lg:text-3xl font-light tracking-widest uppercase drop-shadow-lg mb-12"
         >
           timeless elegance <span className="block md:inline font-serif italic text-rose-200">meets</span> modern intention
         </motion.p>
         
-        {/* Smooth scroll arrow - positioned in lower-middle */}
         <motion.div 
           className="absolute bottom-[25%] left-1/2 transform -translate-x-1/2"
           initial={{ opacity: 0, y: 20 }}
@@ -94,7 +138,7 @@ const CategoriesSection = () => {
         <motion.h2 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
           viewport={{ once: true }}
           className="text-3xl md:text-4xl font-serif text-center mb-3 uppercase tracking-widest text-gray-900"
         >
@@ -108,15 +152,15 @@ const CategoriesSection = () => {
           {categories.map((cat, index) => (
             <motion.div
               key={cat.name}
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
               viewport={{ once: true }}
               onClick={() => navigate(`/shop?category=${cat.name}`)}
               className="group cursor-pointer relative"
             >
               <div className="relative overflow-hidden rounded-2xl aspect-[3/4] bg-gray-100 shadow-md hover:shadow-xl transition-all duration-300">
-                <img 
+                <LazyImage 
                   src={cat.img} 
                   alt={cat.name} 
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -139,7 +183,6 @@ const CategoriesSection = () => {
           ))}
         </div>
 
-        {/* Mobile Shop button - lighter theme, just "Shop" */}
         <div className="md:hidden flex justify-center mt-8">
           <button 
             onClick={() => navigate('/shop')}
@@ -177,7 +220,7 @@ const GiftingSection = () => {
       setActiveIndex((prev) => (prev + 1) % giftImages.length);
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [giftImages.length]);
 
   return (
     <section className="flex flex-col md:flex-row h-auto md:h-[600px]">
@@ -186,6 +229,9 @@ const GiftingSection = () => {
           {giftImages.map((img, index) => {
             const offset = index - activeIndex;
             const isActive = index === activeIndex;
+            const isVisible = Math.abs(offset) <= 2;
+            
+            if (!isVisible) return null;
             
             return (
               <motion.div
@@ -198,7 +244,6 @@ const GiftingSection = () => {
                   x: offset * 10,
                   scale: isActive ? 1 : 0.9 - Math.abs(offset) * 0.05,
                   zIndex: giftImages.length - Math.abs(offset),
-                  opacity: Math.abs(offset) > 2 ? 0 : 1,
                 }}
                 transition={{
                   duration: 0.5,
@@ -210,6 +255,7 @@ const GiftingSection = () => {
                     src={img} 
                     alt={`Gift ${index + 1}`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
               </motion.div>
@@ -225,6 +271,7 @@ const GiftingSection = () => {
               className={`w-2 h-2 rounded-full transition-all duration-300 ${
                 index === activeIndex ? 'bg-rose-500 w-6' : 'bg-white/50'
               }`}
+              aria-label={`Go to image ${index + 1}`}
             />
           ))}
         </div>
@@ -237,15 +284,6 @@ const GiftingSection = () => {
         <p className="max-w-md text-base md:text-lg text-gray-700 leading-relaxed mb-6 md:mb-8">
           Jewellery that feels personal, packaging that looks like a celebration. Whether it's a thoughtful surprise or a spontaneous gesture, our pieces come ready to gift, no extra wrapping required.
         </p>
-        
-        <motion.div 
-          className="flex flex-col items-center gap-4"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-        >
-        </motion.div>
       </div>
     </section>
   );
@@ -312,15 +350,14 @@ const BentoCollectionsSection = () => {
       default:
         return 'col-span-1 row-span-1';
     }
-};
-
+  };
 
   return (
     <section className="py-16 md:py-24 px-4 md:px-6 bg-gradient-to-b from-rose-50 via-white to-pink-50">
       <motion.h2 
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.5 }}
         viewport={{ once: true }}
         className="text-3xl md:text-5xl font-serif text-center mb-4 uppercase tracking-widest text-gray-900"
       >
@@ -337,55 +374,55 @@ const BentoCollectionsSection = () => {
             key={collection.name}
             className={`${getSizeClasses(collection.size)} group relative overflow-hidden rounded-3xl cursor-pointer block`}
           >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-            viewport={{ once: true }}
-            onHoverStart={() => setHoveredIndex(index)}
-            onHoverEnd={() => setHoveredIndex(null)}
-            className="w-full h-full relative"
-          >
-            <div className="absolute inset-0">
-              <img 
-                src={collection.img} 
-                alt={collection.name}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
-              <div className={`absolute inset-0 bg-gradient-to-br ${collection.color} mix-blend-multiply opacity-40 group-hover:opacity-60 transition-opacity duration-300`} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: index * 0.05 }}
+              viewport={{ once: true }}
+              onHoverStart={() => setHoveredIndex(index)}
+              onHoverEnd={() => setHoveredIndex(null)}
+              className="w-full h-full relative"
+            >
+              <div className="absolute inset-0">
+                <LazyImage 
+                  src={collection.img} 
+                  alt={collection.name}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                <div className={`absolute inset-0 bg-gradient-to-br ${collection.color} mix-blend-multiply opacity-40 group-hover:opacity-60 transition-opacity duration-300`} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              </div>
 
-            <div className="absolute inset-0 p-4 md:p-6 flex flex-col justify-end">
-              <motion.div
-                animate={{
-                  y: hoveredIndex === index ? -10 : 0,
-                }}
-                transition={{ duration: 0.3 }}
-              >
-                <h3 className="text-white font-serif text-lg md:text-2xl mb-1 md:mb-2 tracking-wide">
-                  {collection.name}
-                </h3>
-                <p className="text-white/90 text-xs md:text-sm mb-3 md:mb-4">
-                  {collection.description}
-                </p>
-                
-                <motion.button
-                  initial={{ opacity: 0, y: 10 }}
+              <div className="absolute inset-0 p-4 md:p-6 flex flex-col justify-end">
+                <motion.div
                   animate={{
-                    opacity: hoveredIndex === index ? 1 : 0,
-                    y: hoveredIndex === index ? 0 : 10,
+                    y: hoveredIndex === index ? -10 : 0,
                   }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-white text-gray-900 px-4 md:px-5 py-2 rounded-full text-xs md:text-sm uppercase tracking-wider font-medium shadow-lg hover:bg-rose-500 hover:text-white transition-colors"
+                  transition={{ duration: 0.3 }}
                 >
-                  Explore
-                </motion.button>
-              </motion.div>
-            </div>
+                  <h3 className="text-white font-serif text-lg md:text-2xl mb-1 md:mb-2 tracking-wide">
+                    {collection.name}
+                  </h3>
+                  <p className="text-white/90 text-xs md:text-sm mb-3 md:mb-4">
+                    {collection.description}
+                  </p>
+                  
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{
+                      opacity: hoveredIndex === index ? 1 : 0,
+                      y: hoveredIndex === index ? 0 : 10,
+                    }}
+                    transition={{ duration: 0.2 }}
+                    className="bg-white text-gray-900 px-4 md:px-5 py-2 rounded-full text-xs md:text-sm uppercase tracking-wider font-medium shadow-lg hover:bg-rose-500 hover:text-white transition-colors"
+                  >
+                    Explore
+                  </button>
+                </motion.div>
+              </div>
 
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-bl-full blur-2xl" />
-          </motion.div>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-bl-full blur-2xl" />
+            </motion.div>
           </Link>
         ))}
       </div>
@@ -408,7 +445,7 @@ const FloatingGallerySection = () => {
       <motion.h2 
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.5 }}
         viewport={{ once: true }}
         className="text-3xl md:text-5xl font-serif text-center mb-4 uppercase tracking-widest text-gray-900"
       >
@@ -424,26 +461,17 @@ const FloatingGallerySection = () => {
             key={index}
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: item.delay }}
+            transition={{ duration: 0.5, delay: item.delay }}
             viewport={{ once: true }}
             className="break-inside-avoid group"
           >
             <div className={`${item.height} relative overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300`}>
-              <motion.img
-                whileHover={{ scale: 1.1, rotate: 2 }}
-                transition={{ duration: 0.5 }}
+              <LazyImage
                 src={item.img}
                 alt={`Gallery ${index + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-rose-500/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
-                <motion.span
-                  initial={{ y: 20, opacity: 0 }}
-                  whileHover={{ y: 0, opacity: 1 }}
-                  className="text-white font-serif text-xl tracking-wider"
-                >
-                </motion.span>
-              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-rose-500/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6" />
             </div>
           </motion.div>
         ))}
