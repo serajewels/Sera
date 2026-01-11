@@ -5,12 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaFilter, FaSearch, FaShoppingCart, FaTimes, FaCheck, FaChevronLeft, FaChevronRight, FaStar } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
+
 const Shop = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 12;
 
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedTags, setSelectedTags] = useState([]);
@@ -18,32 +18,67 @@ const Shop = () => {
   const [priceRange, setPriceRange] = useState(10000);
   const [showInStock, setShowInStock] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState('relevance'); // ✅ NEW: Sort state
+  const [sortBy, setSortBy] = useState('relevance');
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
   
   const location = useLocation();
   const navigate = useNavigate();
   const categories = ['All', 'Necklace', 'Earrings', 'Bracelet', 'Rings'];
 
+  // CHANGE: Fetch products with backend filtering and pagination
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/products?limit=1000`);
-      const safeProducts = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
+      const params = new URLSearchParams();
+      params.set('page', currentPage);
+      params.set('limit', ITEMS_PER_PAGE);
+
+      // Pass filters to backend
+      if (selectedCategory !== 'All') {
+        params.set('category', selectedCategory.toLowerCase());
+      }
+      if (searchQuery.trim()) {
+        params.set('keyword', searchQuery);
+      }
+      if (priceRange < 10000) {
+        params.set('maxPrice', priceRange);
+      }
+      if (showInStock) {
+        params.set('inStock', 'true');
+      }
+      if (selectedTags.includes('bestseller')) {
+        params.set('tags', 'bestseller');
+      }
+      if (sortBy !== 'relevance') {
+        params.set('sort', sortBy);
+      }
+
+      const { data } = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/products?${params.toString()}`
+      );
+
+      const safeProducts = Array.isArray(data.products) ? data.products : [];
       setProducts(safeProducts);
-      setFilteredProducts(safeProducts);
+      setTotalPages(data.pages || 1);
+      setTotalProducts(data.total || 0);
     } catch (error) {
       console.error('Error fetching products:', error);
       setProducts([]);
-      setFilteredProducts([]);
+      setTotalPages(0);
+      setTotalProducts(0);
+      toast.error('Failed to load products');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, selectedCategory, searchQuery, priceRange, showInStock, selectedTags, sortBy]);
 
+  // Fetch products whenever filters change
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
+  // Handle URL parameters
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const pageParam = params.get('page');
@@ -71,106 +106,6 @@ const Shop = () => {
     }
   }, [location]);
 
-  // ✅ UPDATED: Apply sorting after filtering
-  const filteredAndPaginatedProducts = useMemo(() => {
-    const safeProducts = Array.isArray(products) ? products : [];
-    let result = safeProducts;
-
-    // Filter by Category
-    if (selectedCategory !== 'All') {
-      result = result.filter(p => 
-        p.category && 
-        p.category.toLowerCase() === selectedCategory.toLowerCase()
-      );
-    }
-
-    // Filter by Stock Status
-    if (showInStock) {
-      result = result.filter(p => p.stock > 0);
-    }
-
-    // Filter by Tags
-    if (selectedTags.length > 0) {
-      const hasBestseller = selectedTags.includes('bestseller');
-      
-      if (hasBestseller) {
-        const otherTags = selectedTags.filter(t => t !== 'bestseller');
-        
-        if (otherTags.length > 0) {
-          result = result.filter(p => 
-            p.tags && otherTags.every(t => p.tags.includes(t))
-          );
-        }
-        
-        if (selectedCategory === 'All') {
-          const grouped = {};
-          result.forEach(p => {
-            const cat = p.category || 'Uncategorized';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(p);
-          });
-          
-          const bestsellers = [];
-          Object.keys(grouped).forEach(cat => {
-            const sorted = grouped[cat].sort((a, b) => {
-              const salesA = a.sales || 0;
-              const salesB = b.sales || 0;
-              if (salesB !== salesA) return salesB - salesA;
-              return new Date(b.createdAt) - new Date(a.createdAt);
-            });
-            bestsellers.push(...sorted.slice(0, 3));
-          });
-          result = bestsellers;
-        } else {
-          result.sort((a, b) => (b.sales || 0) - (a.sales || 0));
-        }
-      } else {
-        result = result.filter(p => 
-          p.tags && selectedTags.every(t => p.tags.includes(t))
-        );
-      }
-    }
-
-    // Filter by Search Query
-    if (searchQuery.trim()) {
-      const lowerQuery = searchQuery.toLowerCase();
-      result = result.filter(p => 
-        p.name && p.name.toLowerCase().includes(lowerQuery)
-      );
-    }
-
-    // Filter by Price Range
-    result = result.filter(p => 
-      p.price && typeof p.price === 'number' && p.price <= priceRange
-    );
-
-    // ✅ NEW: Apply sorting
-    switch(sortBy) {
-      case 'price-low':
-        result.sort((a, b) => (a.price || 0) - (b.price || 0));
-        break;
-      case 'price-high':
-        result.sort((a, b) => (b.price || 0) - (a.price || 0));
-        break;
-      case 'newest':
-        result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        break;
-      case 'best-selling':
-        result.sort((a, b) => (b.sales || 0) - (a.sales || 0));
-        break;
-      default: // 'relevance' - no sort
-        break;
-    }
-
-    setFilteredProducts(result);
-    return result;
-  }, [products, selectedCategory, searchQuery, priceRange, selectedTags, showInStock, sortBy]);
-
-  const totalPages = Math.ceil(filteredAndPaginatedProducts.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedProducts = filteredAndPaginatedProducts.slice(startIndex, endIndex);
-
   const buildQueryString = (page = 1, categoryOverride = null) => {
     const params = new URLSearchParams();
     if (page > 1) params.set('page', page);
@@ -182,13 +117,12 @@ const Shop = () => {
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
+    setCurrentPage(1);
     setShowFilters(false);
-    const newPage = 1;
-    setCurrentPage(newPage);
     if (category === 'All') {
       navigate('/shop');
     } else {
-      const query = buildQueryString(newPage, category);
+      const query = buildQueryString(1, category);
       navigate(`/shop${query ? '?' + query : ''}`);
     }
   };
@@ -202,7 +136,6 @@ const Shop = () => {
     }
   };
 
-  // ✅ NEW: Toggle bestseller tag
   const handleBestsellersToggle = () => {
     if (selectedTags.includes('bestseller')) {
       setSelectedTags(selectedTags.filter(t => t !== 'bestseller'));
@@ -252,7 +185,7 @@ const Shop = () => {
       );
     }
 
-    if (paginatedProducts.length === 0 && filteredAndPaginatedProducts.length === 0) {
+    if (products.length === 0) {
       return (
         <div className="text-center py-12 md:py-20 col-span-full">
           <motion.div
@@ -285,7 +218,7 @@ const Shop = () => {
       );
     }
 
-    return paginatedProducts.map(product => (
+    return products.map(product => (
       <Link 
         to={`/product/${product._id}`} 
         key={product._id || Math.random()} 
@@ -301,6 +234,7 @@ const Shop = () => {
               alt={product.name || 'Product'}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               loading="lazy"
+              decoding="async"
               onError={(e) => {
                 e.target.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E';
               }}
@@ -503,7 +437,10 @@ const Shop = () => {
                       <input 
                         type="checkbox" 
                         checked={showInStock}
-                        onChange={(e) => setShowInStock(e.target.checked)}
+                        onChange={(e) => {
+                          setShowInStock(e.target.checked);
+                          setCurrentPage(1);
+                        }}
                         className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
@@ -514,7 +451,7 @@ const Shop = () => {
                   </label>
                 </div>
 
-                {/* ✅ NEW: Bestseller Toggle */}
+                {/* Bestseller Toggle */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
                     <FaStar className="text-rose-500" /> Bestsellers
@@ -535,14 +472,17 @@ const Shop = () => {
                   </label>
                 </div>
 
-                {/* ✅ NEW: Sort By Dropdown */}
+                {/* Sort By Dropdown */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
                     <FaFilter className="text-rose-500" /> Sort By
                   </h3>
                   <select 
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
+                    onChange={(e) => {
+                      setSortBy(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-3 md:px-4 py-2 md:py-3 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-sm md:text-base bg-white cursor-pointer"
                   >
                     <option value="relevance">Relevance</option>
@@ -562,7 +502,10 @@ const Shop = () => {
                     type="text" 
                     placeholder="Search products..." 
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="w-full border border-gray-300 rounded-lg px-3 md:px-4 py-2 md:py-3 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-sm md:text-base"
                   />
                 </div>
@@ -586,8 +529,7 @@ const Shop = () => {
           >
             <div className="mb-4 md:mb-8 flex items-center justify-between flex-wrap gap-2 md:gap-4">
               <div className="text-xs md:text-sm text-gray-600">
-                Showing {startIndex + 1}–{Math.min(endIndex, filteredAndPaginatedProducts.length)} of {filteredAndPaginatedProducts.length} products 
-                {filteredAndPaginatedProducts.length < products.length && ` (filtered from ${products.length})`}
+                Showing {products.length > 0 ? ((currentPage - 1) * ITEMS_PER_PAGE) + 1 : 0}–{Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts} products
               </div>
             </div>
 
