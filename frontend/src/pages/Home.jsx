@@ -417,7 +417,7 @@ const BentoCollectionsSection = () => {
                     className="bg-white text-gray-900 px-4 md:px-5 py-2 rounded-full text-xs md:text-sm uppercase tracking-wider font-medium shadow-lg hover:bg-rose-500 hover:text-white transition-colors"
                   >
                     Explore
-                  </button>
+                  </motion.button>
                 </motion.div>
               </div>
 
