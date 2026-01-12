@@ -1,16 +1,44 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaFilter, FaSearch, FaShoppingCart, FaTimes, FaCheck, FaChevronLeft, FaChevronRight, FaStar } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
+// Custom Hook: Synchronize URL params with state (prevents race conditions)
+const useURLSync = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const getURLParams = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      category: params.get('category') ? 
+        params.get('category').charAt(0).toUpperCase() + params.get('category').slice(1).toLowerCase() 
+        : 'All',
+      page: Math.max(1, parseInt(params.get('page') || '1', 10)),
+      tags: params.get('tags') ? params.get('tags').split(',').map(t => t.trim()) : [],
+    };
+  }, [location.search]);
 
+  const updateURLParams = useCallback((newParams) => {
+    const params = new URLSearchParams();
+    if (newParams.page && newParams.page > 1) params.set('page', newParams.page);
+    if (newParams.category && newParams.category !== 'All') {
+      params.set('category', newParams.category.toLowerCase());
+    }
+    if (newParams.tags && newParams.tags.length > 0) {
+      params.set('tags', newParams.tags.join(','));
+    }
+    navigate(`/shop${params.toString() ? '?' + params.toString() : ''}`);
+  }, [navigate]);
+
+  return { getURLParams, updateURLParams, location };
+};
 
 const Shop = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 12;
-
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,33 +51,56 @@ const Shop = () => {
   const [sortBy, setSortBy] = useState('relevance');
   const [totalPages, setTotalPages] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
-  
-  const location = useLocation();
+
+  const { getURLParams, updateURLParams } = useURLSync();
   const navigate = useNavigate();
   const categories = ['All', 'Necklace', 'Earrings', 'Bracelet', 'Rings'];
+  
+  // Use refs to prevent race conditions
+  const abortControllerRef = useRef(null);
+  const lastFetchParamsRef = useRef(null);
 
+  // Memoized fetch params to prevent unnecessary refetches
+  const fetchParams = useMemo(() => ({
+    currentPage,
+    selectedCategory,
+    selectedTags,
+    searchQuery,
+    priceRange,
+    showInStock,
+    sortBy,
+  }), [currentPage, selectedCategory, selectedTags, searchQuery, priceRange, showInStock, sortBy]);
 
-  // CHANGE: Fetch products with backend filtering and pagination
+  // OPTIMIZED: Fetch products with proper async handling
   const fetchProducts = useCallback(async () => {
+    // Cancel previous request if still pending
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
-      // NEW: Check if bestseller is selected - use special endpoint
+      const paramKey = JSON.stringify(fetchParams);
+      lastFetchParamsRef.current = paramKey;
+
       if (selectedTags.includes('bestseller')) {
         const { data } = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/products/bestsellers`
+          `${import.meta.env.VITE_API_URL}/api/products/bestsellers`,
+          { signal: abortControllerRef.current.signal }
         );
-        
-        const safeProducts = Array.isArray(data.products) ? data.products : [];
-        setProducts(safeProducts);
-        setTotalPages(1); // No pagination for bestsellers
-        setTotalProducts(safeProducts.length);
+
+        if (lastFetchParamsRef.current === paramKey) {
+          const safeProducts = Array.isArray(data.products) ? data.products : [];
+          setProducts(safeProducts);
+          setTotalPages(1);
+          setTotalProducts(safeProducts.length);
+        }
       } else {
-        // Normal fetch with all filters
         const params = new URLSearchParams();
         params.set('page', currentPage);
         params.set('limit', ITEMS_PER_PAGE);
 
-        // Pass filters to backend
         if (selectedCategory !== 'All') {
           params.set('category', selectedCategory.toLowerCase());
         }
@@ -67,117 +118,85 @@ const Shop = () => {
         }
 
         const { data } = await axios.get(
-          `${import.meta.env.VITE_API_URL}/api/products?${params.toString()}`
+          `${import.meta.env.VITE_API_URL}/api/products?${params.toString()}`,
+          { signal: abortControllerRef.current.signal }
         );
 
-        const safeProducts = Array.isArray(data.products) ? data.products : [];
-        setProducts(safeProducts);
-        setTotalPages(data.pages || 1);
-        setTotalProducts(data.total || 0);
+        // Only update state if this is still the latest request
+        if (lastFetchParamsRef.current === paramKey) {
+          const safeProducts = Array.isArray(data.products) ? data.products : [];
+          setProducts(safeProducts);
+          setTotalPages(data.pages || 1);
+          setTotalProducts(data.total || 0);
+        }
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
-      setProducts([]);
-      setTotalPages(0);
-      setTotalProducts(0);
-      toast.error('Failed to load products');
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching products:', error);
+        setProducts([]);
+        setTotalPages(0);
+        setTotalProducts(0);
+        toast.error('Failed to load products');
+      }
     } finally {
       setLoading(false);
     }
-  }, [currentPage, selectedCategory, searchQuery, priceRange, showInStock, selectedTags, sortBy]);
+  }, [currentPage, selectedCategory, searchQuery, priceRange, showInStock, selectedTags, sortBy, fetchParams]);
 
-
-  // Fetch products whenever filters change
+  // Fetch when filter dependencies change
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+  }, [fetchParams]);
 
-
-  // Handle URL parameters
+  // Handle URL synchronization on mount and location change
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const pageParam = params.get('page');
-    const categoryParam = params.get('category');
-    const tagsParam = params.get('tags');
-
-
-    if (pageParam) {
-      const pageNum = Math.max(1, parseInt(pageParam, 10));
-      setCurrentPage(pageNum);
-    } else {
-      setCurrentPage(1);
+    const urlParams = getURLParams();
+    
+    // Only update state if URL params differ from current state
+    if (urlParams.category !== selectedCategory) {
+      setSelectedCategory(urlParams.category);
     }
-
-
-    if (categoryParam) {
-      const formattedCategory = categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1).toLowerCase();
-      setSelectedCategory(formattedCategory);
-    } else {
-      setSelectedCategory('All');
+    if (urlParams.page !== currentPage) {
+      setCurrentPage(urlParams.page);
     }
-
-
-    if (tagsParam) {
-      setSelectedTags(tagsParam.split(',').map(t => t.trim()));
-    } else {
-      setSelectedTags([]);
+    if (JSON.stringify(urlParams.tags) !== JSON.stringify(selectedTags)) {
+      setSelectedTags(urlParams.tags);
     }
-  }, [location]);
-
-
-  const buildQueryString = (page = 1, categoryOverride = null) => {
-    const params = new URLSearchParams();
-    if (page > 1) params.set('page', page);
-    const catToUse = categoryOverride !== null ? categoryOverride : selectedCategory;
-    if (catToUse !== 'All') params.set('category', catToUse.toLowerCase());
-    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
-    return params.toString();
-  };
-
+  }, [getURLParams]);
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
     setCurrentPage(1);
     setShowFilters(false);
-    if (category === 'All') {
-      navigate('/shop');
-    } else {
-      const query = buildQueryString(1, category);
-      navigate(`/shop${query ? '?' + query : ''}`);
-    }
+    updateURLParams({ category, page: 1, tags: selectedTags });
   };
-
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
-      const query = buildQueryString(newPage);
-      navigate(`/shop${query ? '?' + query : ''}`);
+      updateURLParams({ category: selectedCategory, page: newPage, tags: selectedTags });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-
   const handleBestsellersToggle = () => {
-    if (selectedTags.includes('bestseller')) {
-      setSelectedTags(selectedTags.filter(t => t !== 'bestseller'));
-    } else {
-      setSelectedTags([...selectedTags, 'bestseller']);
-    }
+    const newTags = selectedTags.includes('bestseller')
+      ? selectedTags.filter(t => t !== 'bestseller')
+      : [...selectedTags, 'bestseller'];
+    setSelectedTags(newTags);
     setCurrentPage(1);
+    updateURLParams({ category: selectedCategory, page: 1, tags: newTags });
   };
-
 
   const addToCart = async (e, productId) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const userInfo = JSON.parse(localStorage.getItem('userInfo'));
     if (!userInfo) {
       navigate('/login?redirect=/shop');
       return;
     }
-
 
     try {
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
@@ -188,7 +207,6 @@ const Shop = () => {
       toast.error('Failed to add to cart');
     }
   };
-
 
   const renderProducts = () => {
     if (loading) {
@@ -209,7 +227,6 @@ const Shop = () => {
         </div>
       );
     }
-
 
     if (products.length === 0) {
       return (
@@ -244,11 +261,10 @@ const Shop = () => {
       );
     }
 
-
     return products.map(product => (
-      <Link 
-        to={`/product/${product._id}`} 
-        key={product._id || Math.random()} 
+      <Link
+        to={`/product/${product._id}`}
+        key={product._id || Math.random()}
         className="group"
       >
         <motion.div
@@ -256,8 +272,8 @@ const Shop = () => {
           className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300"
         >
           <div className="relative aspect-square overflow-hidden bg-gray-100">
-            <img 
-              src={product.images?.[0] || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E'} 
+            <img
+              src={product.images?.[0] || 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect fill=\'%23f3f4f6\' width=\'300\' height=\'300\'/%3E%3Ctext fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'24\' dy=\'10.5\' font-weight=\'bold\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3ENo Image%3C/text%3E%3C/svg%3E'}
               alt={product.name || 'Product'}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               loading="lazy"
@@ -267,14 +283,14 @@ const Shop = () => {
               }}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-            
+
             {product.stock === 0 && (
               <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                 Out of Stock
               </div>
             )}
-            
-            <button 
+
+            <button
               onClick={(e) => addToCart(e, product._id)}
               className="absolute bottom-3 right-3 md:bottom-4 md:right-4 bg-white text-gray-900 p-2 md:p-3 rounded-full shadow-lg opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-rose-500 hover:text-white hover:shadow-xl"
               title="Add to Cart"
@@ -283,7 +299,7 @@ const Shop = () => {
               <FaShoppingCart className="w-3 h-3 md:w-4 md:h-4" />
             </button>
           </div>
-          
+
           <div className="p-3 md:p-4 text-center">
             <h3 className="font-serif text-base md:text-lg text-gray-900 group-hover:text-rose-500 transition-colors mb-1 truncate">
               {product.name || 'Unnamed Product'}
@@ -307,38 +323,32 @@ const Shop = () => {
     ));
   };
 
-
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
-
     const pageNumbers = [];
     const maxVisible = 5;
-    
+
     let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-    
+
     if (endPage - startPage < maxVisible - 1) {
       startPage = Math.max(1, endPage - maxVisible + 1);
     }
-
 
     if (startPage > 1) {
       pageNumbers.push(1);
       if (startPage > 2) pageNumbers.push('...');
     }
 
-
     for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(i);
     }
-
 
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) pageNumbers.push('...');
       pageNumbers.push(totalPages);
     }
-
 
     return (
       <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
@@ -351,7 +361,6 @@ const Shop = () => {
           <FaChevronLeft className="w-4 h-4" />
         </button>
 
-
         {pageNumbers.map((num, idx) => (
           <button
             key={idx}
@@ -359,18 +368,17 @@ const Shop = () => {
             disabled={num === '...'}
             className={`
               px-3 py-2 rounded-lg font-medium transition-colors
-              ${num === currentPage 
-                ? 'bg-rose-500 text-white' 
-                : num === '...'
+              ${num === currentPage
+              ? 'bg-rose-500 text-white'
+              : num === '...'
                 ? 'cursor-default text-gray-500'
                 : 'border border-gray-300 hover:bg-rose-50 hover:border-rose-500'
-              }
+            }
             `}
           >
             {num}
           </button>
         ))}
-
 
         <button
           onClick={() => handlePageChange(currentPage + 1)}
@@ -384,12 +392,11 @@ const Shop = () => {
     );
   };
 
-
   return (
     <div className="min-h-screen bg-white pt-16 md:pt-20">
       {/* Header */}
       <div className="bg-rose-50 py-8 md:py-16 px-4 md:px-6 text-center">
-        <motion.h1 
+        <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-2xl md:text-4xl lg:text-5xl font-serif text-gray-900 mb-2 md:mb-4"
@@ -406,7 +413,6 @@ const Shop = () => {
         </p>
       </div>
 
-
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-12">
         {/* Mobile Filter Button */}
         <button
@@ -416,12 +422,11 @@ const Shop = () => {
           {showFilters ? <FaTimes className="w-5 h-5" /> : <FaFilter className="w-5 h-5" />}
         </button>
 
-
         <div className="flex flex-col lg:flex-row gap-6 md:gap-12">
           {/* Sidebar / Filters */}
           <AnimatePresence>
             {(showFilters || window.innerWidth >= 1024) && (
-              <motion.div 
+              <motion.div
                 initial={{ x: -300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -300, opacity: 0 }}
@@ -442,7 +447,6 @@ const Shop = () => {
                   <FaTimes className="w-6 h-6" />
                 </button>
 
-
                 {/* Categories */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border mt-12 lg:mt-0">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -451,12 +455,12 @@ const Shop = () => {
                   <ul className="space-y-2 md:space-y-3">
                     {categories.map(cat => (
                       <li key={cat}>
-                        <button 
+                        <button
                           onClick={() => handleCategoryClick(cat)}
                           disabled={selectedTags.includes('bestseller')}
                           className={`w-full text-left py-2 px-3 md:px-4 rounded-lg transition-colors text-sm md:text-base font-medium ${
-                            selectedCategory === cat 
-                              ? 'bg-rose-500 text-white shadow-md' 
+                            selectedCategory === cat
+                              ? 'bg-rose-500 text-white shadow-md'
                               : 'text-gray-600 hover:bg-rose-50 hover:text-rose-500'
                           } ${selectedTags.includes('bestseller') ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -467,7 +471,6 @@ const Shop = () => {
                   </ul>
                 </div>
 
-
                 {/* Stock Filter */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -475,8 +478,8 @@ const Shop = () => {
                   </h3>
                   <label className="flex items-center gap-3 cursor-pointer group select-none">
                     <div className="relative">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={showInStock}
                         onChange={(e) => {
                           setShowInStock(e.target.checked);
@@ -493,7 +496,6 @@ const Shop = () => {
                   </label>
                 </div>
 
-
                 {/* Bestseller Toggle */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -501,8 +503,8 @@ const Shop = () => {
                   </h3>
                   <label className="flex items-center gap-3 cursor-pointer group select-none">
                     <div className="relative">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={selectedTags.includes('bestseller')}
                         onChange={handleBestsellersToggle}
                         className="sr-only peer"
@@ -515,13 +517,12 @@ const Shop = () => {
                   </label>
                 </div>
 
-
                 {/* Sort By Dropdown */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
                     <FaFilter className="text-rose-500" /> Sort By
                   </h3>
-                  <select 
+                  <select
                     value={sortBy}
                     onChange={(e) => {
                       setSortBy(e.target.value);
@@ -538,15 +539,14 @@ const Shop = () => {
                   </select>
                 </div>
 
-
                 {/* Search */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
                     <FaSearch className="text-rose-500" /> Search
                   </h3>
-                  <input 
-                    type="text" 
-                    placeholder="Search products..." 
+                  <input
+                    type="text"
+                    placeholder="Search products..."
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
@@ -560,36 +560,32 @@ const Shop = () => {
             )}
           </AnimatePresence>
 
-
           {/* Overlay for mobile */}
           {showFilters && (
-            <div 
+            <div
               className="lg:hidden fixed inset-0 bg-black/50 z-40"
               onClick={() => setShowFilters(false)}
             />
           )}
 
-
           {/* Product Grid */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="w-full lg:w-3/4"
           >
             <div className="mb-4 md:mb-8 flex items-center justify-between flex-wrap gap-2 md:gap-4">
               <div className="text-xs md:text-sm text-gray-600">
-                {selectedTags.includes('bestseller') 
+                {selectedTags.includes('bestseller')
                   ? `Showing ${products.length} top-selling products`
                   : `Showing ${products.length > 0 ? ((currentPage - 1) * ITEMS_PER_PAGE) + 1 : 0}–${Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of ${totalProducts} products`
                 }
               </div>
             </div>
 
-
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {renderProducts()}
             </div>
-
 
             {!selectedTags.includes('bestseller') && renderPagination()}
           </motion.div>
@@ -598,6 +594,5 @@ const Shop = () => {
     </div>
   );
 };
-
 
 export default Shop;
