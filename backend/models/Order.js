@@ -67,7 +67,22 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'paid', 'failed', 'refunded'],
     default: 'pending'
   },
-  trackingNumber: String
+  trackingNumber: String,
+  razorpayOrderId: String,
+  razorpayPaymentId: String,
+  razorpaySignature: String,
+  razorpayInvoiceId: String,
+  razorpayInvoiceUrl: String,
+  couponCode: String,
+  couponDiscountAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  couponId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Coupon'
+  }
 }, { 
   timestamps: true 
 });

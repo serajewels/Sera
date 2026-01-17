@@ -56,6 +56,7 @@ app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/coupons', require('./routes/couponRoutes'));
 
 const path = require('path');
 // Static uploads
