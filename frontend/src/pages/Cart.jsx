@@ -3,17 +3,12 @@ import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaTrash, FaMinus, FaPlus } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import toast from 'react-hot-toast';
 
 const FALLBACK_IMAGE = 'https://picsum.photos/150/150?grayscale'; // or your own image
 
 const Cart = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDiscount, setCouponDiscount] = useState(0);
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [couponLoading, setCouponLoading] = useState(false);
   const navigate = useNavigate();
 
   const getUserInfo = () => {
@@ -92,7 +87,6 @@ const Cart = () => {
   );
   const shipping = subtotal > 999 ? 0 : subtotal > 0 ? 100 : 0;
   const total = subtotal + shipping;
-  const payableTotal = Math.max(total - couponDiscount, 0);
 
   if (loading) {
     return <div className="text-center py-20">Loading Cart...</div>;
@@ -207,81 +201,9 @@ const Cart = () => {
                     Add INR {Math.max(0, 1000 - subtotal)} more for free shipping
                   </p>
                 )}
-                {couponDiscount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>- INR {couponDiscount}</span>
-                  </div>
-                )}
-                <div className="mt-4 pt-4 border-t border-gray-300 space-y-3">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      placeholder="Enter coupon code"
-                      className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-rose-500 focus:border-rose-500 uppercase"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!couponCode.trim()) {
-                          toast.error('Please enter a coupon code.');
-                          return;
-                        }
-                        try {
-                          const userInfo = getUserInfo();
-                          if (!userInfo) {
-                            navigate('/login');
-                            return;
-                          }
-                          const config = {
-                            headers: { Authorization: `Bearer ${userInfo.token}` }
-                          };
-                          setCouponLoading(true);
-                          const { data } = await axios.post(
-                            `${import.meta.env.VITE_API_URL}/api/coupons/validate`,
-                            {
-                              code: couponCode.trim(),
-                              orderTotal: total
-                            },
-                            config
-                          );
-                          setCouponDiscount(data.discountAmount);
-                          setAppliedCoupon(data);
-                          toast.success('Coupon applied successfully');
-                        } catch (err) {
-                          console.error('Coupon validation failed:', err);
-                          const msg =
-                            err.response?.data?.message ||
-                            err.response?.data?.error ||
-                            'Invalid coupon code';
-                          toast.error(msg);
-                          setCouponDiscount(0);
-                          setAppliedCoupon(null);
-                        } finally {
-                          setCouponLoading(false);
-                        }
-                      }}
-                      disabled={couponLoading}
-                      className="px-4 py-2 bg-rose-500 text-white text-sm rounded hover:bg-rose-600 disabled:opacity-50"
-                    >
-                      {couponLoading ? 'Applying...' : 'Apply'}
-                    </button>
-                  </div>
-                  {appliedCoupon && (
-                    <p className="text-xs text-green-700">
-                      Applied {appliedCoupon.code} (
-                      {appliedCoupon.discountType === 'percentage'
-                        ? `${appliedCoupon.discountValue}%`
-                        : `INR ${appliedCoupon.discountValue}`}
-                      ) – You save INR {couponDiscount}
-                    </p>
-                  )}
-                </div>
                 <div className="border-t border-gray-300 pt-4 flex justify-between font-bold text-lg">
                   <span>Total</span>
-                  <span>INR {payableTotal}</span>
+                  <span>INR {total}</span>
                 </div>
               </div>
               <button

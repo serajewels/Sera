@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const { protect } = require('../middleware/authMiddleware');
 const mongoose = require('mongoose');
 const { sendOTPEmail, sendPasswordResetEmail } = require('../services/emailService');
+const Coupon = require('../models/Coupon');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
@@ -109,6 +110,23 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
       isEmailVerified: true
     });
 
+    const firstOrderCouponCode = process.env.FIRST_ORDER_COUPON_CODE || 'FIRST10';
+
+    await Coupon.findOneAndUpdate(
+      { code: firstOrderCouponCode },
+      {
+        $setOnInsert: {
+          code: firstOrderCouponCode,
+          discountType: 'percentage',
+          discountValue: 10,
+          minOrderValue: 0,
+          isActive: true,
+          isFirstOrderOnly: true,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
     // Delete TempUser after successful creation
     await TempUser.deleteOne({ email });
 
@@ -121,7 +139,8 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
       role: user.role,
       isEmailVerified: user.isEmailVerified,
       token: generateToken(user._id),
-      message: 'Registration successful! Welcome to Sera Jewelry.'
+      message: 'Registration successful! Welcome to Sera Jewelry.',
+      firstOrderCouponCode,
     });
 
   } catch (error) {

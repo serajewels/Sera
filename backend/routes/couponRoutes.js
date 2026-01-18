@@ -1,20 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const asyncHandler = require('express-async-handler');
-const Coupon = require('../models/Coupon');
-const Order = require('../models/Order');
 const { protect, admin } = require('../middleware/authMiddleware');
+const Coupon = require('../models/Coupon');
+const User = require('../models/User');
+const Order = require('../models/Order');
 
+// @desc    Get all coupons (Admin)
+// @route   GET /api/coupons
+// @access  Private/Admin
 router.get(
   '/',
   protect,
   admin,
   asyncHandler(async (req, res) => {
-    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    const coupons = await Coupon.find({})
+      .populate('allowedUsers', 'email')
+      .sort({ createdAt: -1 });
     res.json(coupons);
   })
 );
 
+// @desc    Create coupon (Admin)
+// @route   POST /api/coupons
+// @access  Private/Admin
 router.post(
   '/',
   protect,
@@ -27,42 +36,58 @@ router.post(
       minOrderValue,
       expiryDate,
       usageLimit,
+      perUserLimit,
       isActive,
-      firstOrderOnly
+      isFirstOrderOnly,
+      restrictedToUserEmail,
+      description,
     } = req.body;
 
-    const existing = await Coupon.findOne({ code: code.trim().toUpperCase() });
+    const existing = await Coupon.findOne({ code: code.toUpperCase().trim() });
     if (existing) {
       res.status(400);
       throw new Error('Coupon code already exists');
     }
 
+    let allowedUsers = [];
+    if (restrictedToUserEmail) {
+      const user = await User.findOne({
+        email: restrictedToUserEmail.toLowerCase().trim(),
+      });
+      if (!user) {
+        res.status(400);
+        throw new Error('Restricted user not found');
+      }
+      allowedUsers = [user._id];
+    }
+
     const coupon = await Coupon.create({
-      code: code.trim().toUpperCase(),
+      code: code.toUpperCase().trim(),
       discountType,
       discountValue,
-      minOrderValue,
-      expiryDate,
-      usageLimit,
-      isActive,
-      firstOrderOnly
+      minOrderValue: minOrderValue || 0,
+      expiryDate: expiryDate || null,
+      usageLimit: usageLimit || null,
+      perUserLimit: perUserLimit || 1,
+      isActive: typeof isActive === 'boolean' ? isActive : true,
+      isFirstOrderOnly: Boolean(isFirstOrderOnly),
+      allowedUsers,
+      description,
     });
 
-    res.status(201).json(coupon);
+    const created = await coupon.populate('allowedUsers', 'email');
+    res.status(201).json(created);
   })
 );
 
+// @desc    Update coupon (Admin)
+// @route   PUT /api/coupons/:id
+// @access  Private/Admin
 router.put(
   '/:id',
   protect,
   admin,
   asyncHandler(async (req, res) => {
-    const coupon = await Coupon.findById(req.params.id);
-    if (!coupon) {
-      res.status(404);
-      throw new Error('Coupon not found');
-    }
-
     const {
       code,
       discountType,
@@ -70,50 +95,70 @@ router.put(
       minOrderValue,
       expiryDate,
       usageLimit,
+      perUserLimit,
       isActive,
-      firstOrderOnly
+      isFirstOrderOnly,
+      restrictedToUserEmail,
+      description,
     } = req.body;
 
-    if (code) {
-      const normalizedCode = code.trim().toUpperCase();
-      const existing = await Coupon.findOne({
-        code: normalizedCode,
-        _id: { $ne: coupon._id }
-      });
+    const coupon = await Coupon.findById(req.params.id);
+
+    if (!coupon) {
+      res.status(404);
+      throw new Error('Coupon not found');
+    }
+
+    if (code && code.toUpperCase().trim() !== coupon.code) {
+      const existing = await Coupon.findOne({ code: code.toUpperCase().trim() });
       if (existing) {
         res.status(400);
         throw new Error('Another coupon with this code already exists');
       }
-      coupon.code = normalizedCode;
+      coupon.code = code.toUpperCase().trim();
     }
 
-    if (discountType) {
-      coupon.discountType = discountType;
+    if (discountType) coupon.discountType = discountType;
+    if (typeof discountValue === 'number') coupon.discountValue = discountValue;
+    if (typeof minOrderValue === 'number') coupon.minOrderValue = minOrderValue;
+    coupon.expiryDate = expiryDate || null;
+    coupon.usageLimit = typeof usageLimit === 'number' ? usageLimit : coupon.usageLimit;
+    coupon.perUserLimit =
+      typeof perUserLimit === 'number' && perUserLimit > 0
+        ? perUserLimit
+        : coupon.perUserLimit;
+    if (typeof isActive === 'boolean') coupon.isActive = isActive;
+    if (typeof isFirstOrderOnly === 'boolean') {
+      coupon.isFirstOrderOnly = isFirstOrderOnly;
     }
-    if (typeof discountValue === 'number') {
-      coupon.discountValue = discountValue;
+    if (typeof description === 'string') {
+      coupon.description = description;
     }
-    if (typeof minOrderValue === 'number') {
-      coupon.minOrderValue = minOrderValue;
-    }
-    if (expiryDate) {
-      coupon.expiryDate = expiryDate;
-    }
-    if (typeof usageLimit === 'number') {
-      coupon.usageLimit = usageLimit;
-    }
-    if (typeof isActive === 'boolean') {
-      coupon.isActive = isActive;
-    }
-    if (typeof firstOrderOnly === 'boolean') {
-      coupon.firstOrderOnly = firstOrderOnly;
+
+    if (restrictedToUserEmail !== undefined) {
+      if (restrictedToUserEmail) {
+        const user = await User.findOne({
+          email: restrictedToUserEmail.toLowerCase().trim(),
+        });
+        if (!user) {
+          res.status(400);
+          throw new Error('Restricted user not found');
+        }
+        coupon.allowedUsers = [user._id];
+      } else {
+        coupon.allowedUsers = [];
+      }
     }
 
     const updated = await coupon.save();
-    res.json(updated);
+    const populated = await updated.populate('allowedUsers', 'email');
+    res.json(populated);
   })
 );
 
+// @desc    Delete coupon (Admin)
+// @route   DELETE /api/coupons/:id
+// @access  Private/Admin
 router.delete(
   '/:id',
   protect,
@@ -125,93 +170,114 @@ router.delete(
       throw new Error('Coupon not found');
     }
     await coupon.deleteOne();
-    res.json({ message: 'Coupon deleted' });
+    res.json({ message: 'Coupon removed' });
   })
 );
 
+// @desc    Validate coupon for current user and order total
+// @route   POST /api/coupons/validate
+// @access  Private
 router.post(
   '/validate',
   protect,
   asyncHandler(async (req, res) => {
     const { code, orderTotal } = req.body;
 
-    if (!code) {
+    if (!code || !orderTotal || orderTotal <= 0) {
       res.status(400);
-      throw new Error('Coupon code is required');
+      throw new Error('Coupon code and valid order total are required');
     }
 
-    const total = parseFloat(orderTotal);
-    if (!Number.isFinite(total) || total <= 0) {
-      res.status(400);
-      throw new Error('Invalid order total');
-    }
+    const normalizedCode = code.toUpperCase().trim();
 
-    const normalizedCode = code.trim().toUpperCase();
     const coupon = await Coupon.findOne({ code: normalizedCode });
 
-    if (!coupon) {
+    if (!coupon || !coupon.isActive) {
       res.status(400);
-      throw new Error('Invalid coupon code');
-    }
-
-    if (!coupon.isActive) {
-      res.status(400);
-      throw new Error('This coupon is not active');
+      throw new Error('Invalid or inactive coupon');
     }
 
     const now = new Date();
+
     if (coupon.expiryDate && coupon.expiryDate < now) {
       res.status(400);
-      throw new Error('This coupon has expired');
+      throw new Error('Coupon has expired');
     }
 
-    if (coupon.usageLimit && coupon.usageLimit > 0 && coupon.usageCount >= coupon.usageLimit) {
+    if (
+      typeof coupon.usageLimit === 'number' &&
+      coupon.usageLimit >= 0 &&
+      coupon.usageCount >= coupon.usageLimit
+    ) {
       res.status(400);
-      throw new Error('This coupon has reached its usage limit');
+      throw new Error('Coupon usage limit reached');
     }
 
-    if (coupon.minOrderValue && total < coupon.minOrderValue) {
+    if (coupon.minOrderValue && orderTotal < coupon.minOrderValue) {
       res.status(400);
       throw new Error(
-        `Minimum order value of ${coupon.minOrderValue} is required to use this coupon`
+        `Minimum order value for this coupon is INR ${coupon.minOrderValue}`
       );
     }
 
-    if (coupon.firstOrderOnly) {
-      const hasOrder = await Order.exists({
-        user: req.user._id
-      });
-      if (hasOrder) {
+    if (
+      coupon.allowedUsers &&
+      coupon.allowedUsers.length > 0 &&
+      !coupon.allowedUsers.some(
+        (u) => u.toString() === req.user._id.toString()
+      )
+    ) {
+      res.status(400);
+      throw new Error('This coupon is not valid for your account');
+    }
+
+    const userOrderCount = await Order.countDocuments({ user: req.user._id });
+
+    if (coupon.isFirstOrderOnly) {
+      if (userOrderCount > 0) {
         res.status(400);
         throw new Error('This coupon is only valid on your first order');
       }
     }
 
+    if (coupon.perUserLimit && coupon.perUserLimit > 0) {
+      const userCouponUsage = await Order.countDocuments({
+        user: req.user._id,
+        couponCode: coupon.code,
+      });
+
+      if (userCouponUsage >= coupon.perUserLimit) {
+        res.status(400);
+        throw new Error('You have already used this coupon the maximum number of times');
+      }
+    }
+
     let discountAmount = 0;
     if (coupon.discountType === 'percentage') {
-      discountAmount = (total * coupon.discountValue) / 100;
-    } else if (coupon.discountType === 'fixed') {
+      discountAmount = (orderTotal * coupon.discountValue) / 100;
+    } else {
       discountAmount = coupon.discountValue;
     }
 
-    if (discountAmount > total) {
-      discountAmount = total;
+    if (discountAmount > orderTotal) {
+      discountAmount = orderTotal;
     }
 
-    const finalAmount = total - discountAmount;
+    const finalTotal = orderTotal - discountAmount;
 
     res.json({
-      valid: true,
-      couponId: coupon._id,
       code: coupon.code,
-      discountAmount,
-      finalAmount,
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
+      discountAmount,
+      originalTotal: orderTotal,
+      finalTotal,
       minOrderValue: coupon.minOrderValue,
-      firstOrderOnly: coupon.firstOrderOnly
+      isFirstOrderOnly: coupon.isFirstOrderOnly,
+      isActive: coupon.isActive,
     });
   })
 );
 
 module.exports = router;
+

@@ -9,16 +9,14 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [coupons, setCoupons] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
-  const [editingCoupon, setEditingCoupon] = useState(null);
 
   // PAGINATION STATE FOR ALL SECTIONS
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,6 +36,10 @@ const AdminDashboard = () => {
     items: []
   });
 
+  const [selectedContact, setSelectedContact] = useState(null);
+  const navigate = useNavigate();
+
+  const [allProducts, setAllProducts] = useState([]);
   const [couponForm, setCouponForm] = useState({
     code: '',
     discountType: 'percentage',
@@ -45,14 +47,12 @@ const AdminDashboard = () => {
     minOrderValue: '',
     expiryDate: '',
     usageLimit: '',
+    perUserLimit: 1,
     isActive: true,
-    firstOrderOnly: false
+    isFirstOrderOnly: false,
+    restrictedToUserEmail: '',
   });
-
-  const [selectedContact, setSelectedContact] = useState(null);
-  const navigate = useNavigate();
-
-  const [allProducts, setAllProducts] = useState([]);
+  const [editingCouponId, setEditingCouponId] = useState(null);
   
   const fetchAllProducts = async () => {
     try {
@@ -213,27 +213,31 @@ const AdminDashboard = () => {
     });
   }, [debouncedSearch, filters]);
 
-  const filterCoupons = useCallback((coupons) => {
-    return coupons.filter((coupon) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        coupon.code?.toLowerCase().includes(debouncedSearch.toLowerCase());
+  const filterCoupons = useCallback(
+    (items) => {
+      return items.filter((coupon) => {
+        const matchesSearch =
+          !debouncedSearch ||
+          coupon.code?.toLowerCase().includes(debouncedSearch.toLowerCase());
 
-      const matchesStatus =
-        !filters.status ||
-        (filters.status === 'active' && coupon.isActive) ||
-        (filters.status === 'inactive' && !coupon.isActive);
+        const matchesStatus =
+          !filters.status ||
+          (filters.status === 'active'
+            ? coupon.isActive
+            : !coupon.isActive);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [debouncedSearch, filters]);
+        return matchesSearch && matchesStatus;
+      });
+    },
+    [debouncedSearch, filters]
+  );
 
   const filteredProducts = useMemo(() => filterProducts(products), [products, filterProducts]);
   const filteredUsers = useMemo(() => filterUsers(users), [users, filterUsers]);
   const filteredContacts = useMemo(() => filterContacts(contacts), [contacts, filterContacts]);
   const filteredOrders = useMemo(() => filterOrders(orders), [orders, filterOrders]);
-  const filteredCoupons = useMemo(() => filterCoupons(coupons), [coupons, filterCoupons]);
   const filteredCategories = categories;
+  const filteredCoupons = useMemo(() => filterCoupons(coupons), [coupons, filterCoupons]);
 
   // PAGINATION LOGIC - Works for all sections
   const getPaginatedData = (data) => {
@@ -246,8 +250,8 @@ const AdminDashboard = () => {
   const paginatedUsers = useMemo(() => getPaginatedData(filteredUsers), [filteredUsers, currentPage]);
   const paginatedContacts = useMemo(() => getPaginatedData(filteredContacts), [filteredContacts, currentPage]);
   const paginatedOrders = useMemo(() => getPaginatedData(filteredOrders), [filteredOrders, currentPage]);
-  const paginatedCoupons = useMemo(() => getPaginatedData(filteredCoupons), [filteredCoupons, currentPage]);
   const paginatedCategories = useMemo(() => getPaginatedData(filteredCategories), [filteredCategories, currentPage]);
+  const paginatedCoupons = useMemo(() => getPaginatedData(filteredCoupons), [filteredCoupons, currentPage]);
 
   // Calculate total pages for each section
   const getTotalPages = (data) => Math.ceil(data.length / itemsPerPage);
@@ -256,8 +260,8 @@ const AdminDashboard = () => {
   const totalPagesUsers = getTotalPages(filteredUsers);
   const totalPagesContacts = getTotalPages(filteredContacts);
   const totalPagesOrders = getTotalPages(filteredOrders);
-  const totalPagesCoupons = getTotalPages(filteredCoupons);
   const totalPagesCategories = getTotalPages(filteredCategories);
+  const totalPagesCoupons = getTotalPages(filteredCoupons);
 
   useEffect(() => {
     const ui = getUserInfo();
@@ -290,6 +294,9 @@ const AdminDashboard = () => {
       } else if (activeTab === 'users') {
         const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/users`, config);
         setUsers(Array.isArray(data) ? data : []);
+      } else if (activeTab === 'categories') {
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/categories`);
+        setCategories(Array.isArray(data) ? data : []);
       } else if (activeTab === 'coupons') {
         const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/coupons`, config);
         setCoupons(Array.isArray(data) ? data : []);
@@ -308,9 +315,9 @@ const AdminDashboard = () => {
       setProducts([]);
       setUsers([]);
       setCategories([]);
-      setCoupons([]);
       setContacts([]);
       setOrders([]);
+      setCoupons([]);
     } finally {
       setLoading(false);
     }
@@ -349,114 +356,6 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error updating order status:', error);
       alert('Failed to update order status');
-    }
-  };
-
-  const openCouponModal = (coupon = null) => {
-    if (coupon) {
-      setEditingCoupon(coupon);
-      setCouponForm({
-        code: coupon.code || '',
-        discountType: coupon.discountType || 'percentage',
-        discountValue:
-          coupon.discountValue !== undefined && coupon.discountValue !== null
-            ? String(coupon.discountValue)
-            : '',
-        minOrderValue:
-          coupon.minOrderValue !== undefined && coupon.minOrderValue !== null
-            ? String(coupon.minOrderValue)
-            : '',
-        expiryDate: coupon.expiryDate ? String(coupon.expiryDate).substring(0, 10) : '',
-        usageLimit:
-          coupon.usageLimit !== undefined && coupon.usageLimit !== null
-            ? String(coupon.usageLimit)
-            : '',
-        isActive: typeof coupon.isActive === 'boolean' ? coupon.isActive : true,
-        firstOrderOnly:
-          typeof coupon.firstOrderOnly === 'boolean' ? coupon.firstOrderOnly : false
-      });
-    } else {
-      setEditingCoupon(null);
-      setCouponForm({
-        code: '',
-        discountType: 'percentage',
-        discountValue: '',
-        minOrderValue: '',
-        expiryDate: '',
-        usageLimit: '',
-        isActive: true,
-        firstOrderOnly: false
-      });
-    }
-    setIsCouponModalOpen(true);
-  };
-
-  const handleCouponSubmit = async (e) => {
-    e.preventDefault();
-    const ui = getUserInfo();
-    if (!ui) {
-      navigate('/login');
-      return;
-    }
-    const config = { headers: { Authorization: `Bearer ${ui.token}` } };
-
-    const payload = {
-      code: couponForm.code.trim(),
-      discountType: couponForm.discountType,
-      discountValue: Number(couponForm.discountValue) || 0,
-      minOrderValue:
-        couponForm.minOrderValue === '' ? 0 : Number(couponForm.minOrderValue),
-      expiryDate: couponForm.expiryDate,
-      usageLimit: couponForm.usageLimit === '' ? 0 : Number(couponForm.usageLimit),
-      isActive: couponForm.isActive,
-      firstOrderOnly: couponForm.firstOrderOnly
-    };
-
-    try {
-      if (editingCoupon && editingCoupon._id) {
-        await axios.put(
-          `${import.meta.env.VITE_API_URL}/api/coupons/${editingCoupon._id}`,
-          payload,
-          config
-        );
-        toast.success('Coupon updated successfully');
-      } else {
-        await axios.post(
-          `${import.meta.env.VITE_API_URL}/api/coupons`,
-          payload,
-          config
-        );
-        toast.success('Coupon created successfully');
-      }
-      setIsCouponModalOpen(false);
-      setEditingCoupon(null);
-      await fetchData();
-    } catch (error) {
-      console.error('Error saving coupon:', error);
-      const msg = error.response?.data?.message || 'Failed to save coupon';
-      toast.error(msg);
-    }
-  };
-
-  const handleCouponDelete = async (id) => {
-    if (!window.confirm('Delete this coupon?')) return;
-    try {
-      const ui = getUserInfo();
-      if (!ui) {
-        navigate('/login');
-        return;
-      }
-      const config = { headers: { Authorization: `Bearer ${ui.token}` } };
-      await axios.delete(
-        `${import.meta.env.VITE_API_URL}/api/coupons/${id}`,
-        config
-      );
-      toast.success('Coupon deleted');
-      await fetchData();
-    } catch (error) {
-      console.error('Error deleting coupon:', error);
-      const msg = error.response?.data?.message || 'Failed to delete coupon';
-      toast.error(msg);
     }
   };
 
@@ -561,6 +460,143 @@ const AdminDashboard = () => {
       fetchData();
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const resetCouponForm = () => {
+    setCouponForm({
+      code: '',
+      discountType: 'percentage',
+      discountValue: '',
+      minOrderValue: '',
+      expiryDate: '',
+      usageLimit: '',
+      perUserLimit: 1,
+      isActive: true,
+      isFirstOrderOnly: false,
+      restrictedToUserEmail: '',
+    });
+    setEditingCouponId(null);
+  };
+
+  const handleCouponSubmit = async (e) => {
+    e.preventDefault();
+
+    const ui = getUserInfo();
+    if (!ui) {
+      navigate('/login');
+      return;
+    }
+
+    const config = { headers: { Authorization: `Bearer ${ui.token}` } };
+
+    const payload = {
+      code: couponForm.code.toUpperCase().trim(),
+      discountType: couponForm.discountType,
+      discountValue: Number(couponForm.discountValue),
+      minOrderValue: couponForm.minOrderValue
+        ? Number(couponForm.minOrderValue)
+        : 0,
+      expiryDate: couponForm.expiryDate || null,
+      usageLimit: couponForm.usageLimit
+        ? Number(couponForm.usageLimit)
+        : null,
+      perUserLimit: couponForm.perUserLimit
+        ? Number(couponForm.perUserLimit)
+        : 1,
+      isActive: couponForm.isActive,
+      isFirstOrderOnly: couponForm.isFirstOrderOnly,
+      restrictedToUserEmail: couponForm.restrictedToUserEmail.trim() || null,
+    };
+
+    if (!payload.code) {
+      toast.error('Coupon code is required');
+      return;
+    }
+
+    if (!payload.discountValue || payload.discountValue <= 0) {
+      toast.error('Discount value must be greater than zero');
+      return;
+    }
+
+    if (
+      payload.discountType === 'percentage' &&
+      payload.discountValue > 100
+    ) {
+      toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
+
+    try {
+      if (editingCouponId) {
+        await axios.put(
+          `${import.meta.env.VITE_API_URL}/api/coupons/${editingCouponId}`,
+          payload,
+          config
+        );
+        toast.success('Coupon updated successfully');
+      } else {
+        await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/coupons`,
+          payload,
+          config
+        );
+        toast.success('Coupon created successfully');
+      }
+      resetCouponForm();
+      fetchData();
+    } catch (error) {
+      console.error('Error saving coupon:', error);
+      const message =
+        error.response?.data?.message || 'Failed to save coupon';
+      toast.error(message);
+    }
+  };
+
+  const handleCouponEdit = (coupon) => {
+    setEditingCouponId(coupon._id);
+    setCouponForm({
+      code: coupon.code || '',
+      discountType: coupon.discountType || 'percentage',
+      discountValue: coupon.discountValue || '',
+      minOrderValue: coupon.minOrderValue ?? '',
+      expiryDate: coupon.expiryDate
+        ? coupon.expiryDate.substring(0, 10)
+        : '',
+      usageLimit: coupon.usageLimit ?? '',
+      perUserLimit: coupon.perUserLimit || 1,
+      isActive: coupon.isActive,
+      isFirstOrderOnly: coupon.isFirstOrderOnly || false,
+      restrictedToUserEmail:
+        coupon.allowedUsers && coupon.allowedUsers.length > 0
+          ? coupon.allowedUsers[0].email || ''
+          : '',
+    });
+  };
+
+  const handleCouponDelete = async (id) => {
+    if (!window.confirm('Delete this coupon?')) return;
+
+    const ui = getUserInfo();
+    if (!ui) {
+      navigate('/login');
+      return;
+    }
+
+    const config = { headers: { Authorization: `Bearer ${ui.token}` } };
+
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_API_URL}/api/coupons/${id}`,
+        config
+      );
+      toast.success('Coupon deleted');
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting coupon:', error);
+      const message =
+        error.response?.data?.message || 'Failed to delete coupon';
+      toast.error(message);
     }
   };
 
@@ -1191,99 +1227,118 @@ const AdminDashboard = () => {
   };
 
   const renderCouponsTable = () => {
-    if (loading)
+    if (loading) {
       return <div className="flex justify-center py-12">Loading coupons...</div>;
-    if (filteredCoupons.length === 0)
+    }
+    if (filteredCoupons.length === 0) {
       return (
         <div className="text-center py-12 text-gray-500">
-          {searchInput !== '' || Object.values(filters).some(f => f !== '')
+          {searchInput !== '' || Object.values(filters).some((f) => f !== '')
             ? 'No coupons match your filters'
             : 'No coupons found'}
         </div>
       );
+    }
     return (
       <>
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h3 className="font-serif text-lg">Coupon Codes</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 font-medium text-gray-500">Code</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Discount</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Min Order</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Expiry</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Usage</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">First Order</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Active</th>
-                  <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {paginatedCoupons.map((coupon) => (
-                  <tr key={coupon._id || coupon.code}>
-                    <td className="px-6 py-4 font-mono uppercase">{coupon.code}</td>
-                    <td className="px-6 py-4">
-                      {coupon.discountType === 'percentage'
-                        ? `${coupon.discountValue || 0}%`
-                        : `INR ${coupon.discountValue || 0}`}
-                    </td>
-                    <td className="px-6 py-4">
-                      {coupon.minOrderValue ? `INR ${coupon.minOrderValue}` : 'None'}
-                    </td>
-                    <td className="px-6 py-4">
-                      {coupon.expiryDate
-                        ? new Date(coupon.expiryDate).toLocaleDateString()
-                        : 'No expiry'}
-                    </td>
-                    <td className="px-6 py-4">
-                      {coupon.usageLimit && coupon.usageLimit > 0
-                        ? `${coupon.usageCount || 0}/${coupon.usageLimit}`
-                        : `${coupon.usageCount || 0}`}
-                    </td>
-                    <td className="px-6 py-4">
-                      {coupon.firstOrderOnly ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700">
-                          Yes
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-                          No
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {coupon.isActive ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-700">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-100 text-red-600">
-                          Inactive
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 flex gap-3">
+        <div className="bg-white shadow rounded-lg overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 font-medium text-gray-500">Code</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Type</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Value</th>
+                <th className="px-6 py-3 font-medium text-gray-500">
+                  Min Order
+                </th>
+                <th className="px-6 py-3 font-medium text-gray-500">Expiry</th>
+                <th className="px-6 py-3 font-medium text-gray-500">
+                  Usage
+                </th>
+                <th className="px-6 py-3 font-medium text-gray-500">
+                  Per User
+                </th>
+                <th className="px-6 py-3 font-medium text-gray-500">
+                  Restriction
+                </th>
+                <th className="px-6 py-3 font-medium text-gray-500">Status</th>
+                <th className="px-6 py-3 font-medium text-gray-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {paginatedCoupons.map((coupon) => (
+                <tr key={coupon._id || Math.random()}>
+                  <td className="px-6 py-4 font-mono text-sm">
+                    {coupon.code || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 capitalize">
+                    {coupon.discountType}
+                    {coupon.isFirstOrderOnly && (
+                      <span className="ml-2 text-xs text-rose-500">
+                        First order
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {coupon.discountType === 'percentage'
+                      ? `${coupon.discountValue}%`
+                      : `INR ${coupon.discountValue}`}
+                  </td>
+                  <td className="px-6 py-4">
+                    {coupon.minOrderValue ? `INR ${coupon.minOrderValue}` : '-'}
+                  </td>
+                  <td className="px-6 py-4">
+                    {coupon.expiryDate
+                      ? new Date(coupon.expiryDate).toLocaleDateString()
+                      : 'No expiry'}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {typeof coupon.usageLimit === 'number' &&
+                    coupon.usageLimit >= 0
+                      ? `${coupon.usageCount || 0} / ${coupon.usageLimit}`
+                      : `${coupon.usageCount || 0}`}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {coupon.perUserLimit || 1}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {coupon.allowedUsers && coupon.allowedUsers.length > 0
+                      ? coupon.allowedUsers[0].email || 'Specific user'
+                      : 'All users'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        coupon.isActive
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {coupon.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
                       <button
-                        onClick={() => openCouponModal(coupon)}
+                        onClick={() => handleCouponEdit(coupon)}
                         className="text-blue-600 hover:text-blue-800"
+                        title="Edit"
                       >
                         <FaEdit />
                       </button>
                       <button
                         onClick={() => handleCouponDelete(coupon._id)}
                         className="text-red-600 hover:text-red-800"
+                        title="Delete"
                       >
                         <FaTrash />
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <PaginationControls
           currentPage={currentPage}
@@ -1583,18 +1638,221 @@ const AdminDashboard = () => {
 
       {activeTab === 'users' && <div>{renderUsersTable()}</div>}
 
+      {activeTab === 'categories' && <div>{renderCategoriesTable()}</div>}
+
       {activeTab === 'coupons' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-serif">Coupon Codes</h2>
+            <h2 className="text-2xl font-serif">
+              {editingCouponId ? 'Edit Coupon' : 'Create Coupon'}
+            </h2>
             <button
-              onClick={() => openCouponModal()}
-              className="bg-rose-500 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-rose-600 transition-colors disabled:opacity-50"
-              disabled={loading}
+              onClick={resetCouponForm}
+              className="text-sm text-rose-500 hover:underline"
             >
-              <FaPlus /> Add Coupon
+              Clear form
             </button>
           </div>
+          <form
+            onSubmit={handleCouponSubmit}
+            className="bg-white shadow rounded-lg p-6 space-y-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Coupon Code
+                </label>
+                <input
+                  type="text"
+                  value={couponForm.code}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      code: e.target.value.toUpperCase(),
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                  placeholder="e.g. FIRST10"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Discount Type
+                </label>
+                <select
+                  value={couponForm.discountType}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      discountType: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                >
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed Amount</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Discount Value
+                </label>
+                <input
+                  type="number"
+                  value={couponForm.discountValue}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      discountValue: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                  placeholder="10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Minimum Order Value
+                </label>
+                <input
+                  type="number"
+                  value={couponForm.minOrderValue}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      minOrderValue: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  value={couponForm.expiryDate}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      expiryDate: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Global Usage Limit
+                </label>
+                <input
+                  type="number"
+                  value={couponForm.usageLimit}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      usageLimit: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                  placeholder="Leave empty for unlimited"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Per-User Usage Limit
+                </label>
+                <input
+                  type="number"
+                  value={couponForm.perUserLimit}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      perUserLimit: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                  min={1}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Restrict To User (Email)
+                </label>
+                <input
+                  type="email"
+                  value={couponForm.restrictedToUserEmail}
+                  onChange={(e) =>
+                    setCouponForm({
+                      ...couponForm,
+                      restrictedToUserEmail: e.target.value,
+                    })
+                  }
+                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="flex items-center gap-6 mt-6">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={couponForm.isActive}
+                    onChange={(e) =>
+                      setCouponForm({
+                        ...couponForm,
+                        isActive: e.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 text-rose-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">Active</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={couponForm.isFirstOrderOnly}
+                    onChange={(e) =>
+                      setCouponForm({
+                        ...couponForm,
+                        isFirstOrderOnly: e.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 text-rose-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">
+                    First-order only
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={resetCouponForm}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 transition-colors"
+              >
+                {editingCouponId ? 'Update Coupon' : 'Create Coupon'}
+              </button>
+            </div>
+          </form>
+
           {renderCouponsTable()}
         </div>
       )}
@@ -1809,177 +2067,6 @@ const AdminDashboard = () => {
                   className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 transition-colors"
                 >
                   {editingProduct ? 'Update Product' : 'Create Product'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isCouponModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[80]">
-          <div className="bg-white p-8 rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setIsCouponModalOpen(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800"
-            >
-              <FaTimes />
-            </button>
-            <h2 className="text-2xl font-serif mb-6">
-              {editingCoupon ? 'Edit Coupon' : 'Add New Coupon'}
-            </h2>
-            <form onSubmit={handleCouponSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Code
-                </label>
-                <input
-                  type="text"
-                  value={couponForm.code}
-                  onChange={(e) =>
-                    setCouponForm({
-                      ...couponForm,
-                      code: e.target.value.toUpperCase()
-                    })
-                  }
-                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500 uppercase"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Discount Type
-                  </label>
-                  <select
-                    value={couponForm.discountType}
-                    onChange={(e) =>
-                      setCouponForm({
-                        ...couponForm,
-                        discountType: e.target.value
-                      })
-                    }
-                    className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
-                  >
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Discount Value
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={couponForm.discountValue}
-                    onChange={(e) =>
-                      setCouponForm({
-                        ...couponForm,
-                        discountValue: e.target.value
-                      })
-                    }
-                    className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Minimum Order Value
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={couponForm.minOrderValue}
-                    onChange={(e) =>
-                      setCouponForm({
-                        ...couponForm,
-                        minOrderValue: e.target.value
-                      })
-                    }
-                    className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Usage Limit
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={couponForm.usageLimit}
-                    onChange={(e) =>
-                      setCouponForm({
-                        ...couponForm,
-                        usageLimit: e.target.value
-                      })
-                    }
-                    className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Expiry Date
-                </label>
-                <input
-                  type="date"
-                  value={couponForm.expiryDate}
-                  onChange={(e) =>
-                    setCouponForm({
-                      ...couponForm,
-                      expiryDate: e.target.value
-                    })
-                  }
-                  className="w-full border p-2 rounded focus:ring-rose-500 focus:border-rose-500"
-                  required
-                />
-              </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={couponForm.isActive}
-                    onChange={(e) =>
-                      setCouponForm({
-                        ...couponForm,
-                        isActive: e.target.checked
-                      })
-                    }
-                    className="w-4 h-4 text-rose-500 rounded focus:ring-rose-500"
-                  />
-                  <span className="text-sm text-gray-700">Active</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={couponForm.firstOrderOnly}
-                    onChange={(e) =>
-                      setCouponForm({
-                        ...couponForm,
-                        firstOrderOnly: e.target.checked
-                      })
-                    }
-                    className="w-4 h-4 text-rose-500 rounded focus:ring-rose-500"
-                  />
-                  <span className="text-sm text-gray-700">First order only</span>
-                </label>
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setIsCouponModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 transition-colors"
-                >
-                  {editingCoupon ? 'Save Changes' : 'Create Coupon'}
                 </button>
               </div>
             </form>
