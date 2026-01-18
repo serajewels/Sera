@@ -14,8 +14,26 @@ const Checkout = () => {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
+  const [razorpayLoading, setRazorpayLoading] = useState(false);
   const navigate = useNavigate();
 
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const existingScript = document.querySelector(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+      );
+      if (existingScript) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -207,6 +225,141 @@ const Checkout = () => {
     }
   };
 
+  const handleRazorpayPayment = async () => {
+    if (!selectedAddress) {
+      toast.error('Please select or add a shipping address.');
+      return;
+    }
+
+    if (
+      !selectedAddress.street ||
+      !selectedAddress.city ||
+      !selectedAddress.state ||
+      !selectedAddress.postalCode ||
+      !selectedAddress.phone
+    ) {
+      toast.error('Shipping address is incomplete. Please update your address.');
+      console.error('Invalid address:', selectedAddress);
+      return;
+    }
+
+    try {
+      setRazorpayLoading(true);
+
+      const storedUserInfo = localStorage.getItem('userInfo');
+      if (!storedUserInfo) {
+        navigate('/login');
+        return;
+      }
+
+      let userInfo;
+      try {
+        userInfo = JSON.parse(storedUserInfo);
+      } catch (error) {
+        console.error('Failed to parse userInfo from localStorage:', error);
+        localStorage.removeItem('userInfo');
+        navigate('/login');
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error('Failed to load Razorpay. Please try again.');
+        return;
+      }
+
+      const config = {
+        headers: { Authorization: `Bearer ${userInfo.token}` },
+      };
+
+      const amountInPaise = Math.round(total * 100);
+
+      const createOrderResponse = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/payment/create-order`,
+        {
+          amount: amountInPaise,
+          currency: 'INR',
+        },
+        config
+      );
+
+      const orderData = createOrderResponse.data;
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'Sera Jewelry',
+        description: 'Order payment',
+        order_id: orderData.id,
+        prefill: {
+          name: userInfo.name,
+          email: userInfo.email,
+          contact: userInfo.phone,
+        },
+        theme: {
+          color: '#fb7185',
+        },
+        handler: async function (response) {
+          try {
+            const verificationPayload = {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderItems: cartItems.map((item) => ({
+                product: item.product._id,
+                quantity: item.quantity,
+                price: item.product.price,
+              })),
+              shippingAddress: {
+                street: selectedAddress.street,
+                city: selectedAddress.city,
+                state: selectedAddress.state,
+                postalCode: selectedAddress.postalCode,
+                country: selectedAddress.country || 'India',
+                phone: selectedAddress.phone,
+                landmark: selectedAddress.landmark || '',
+              },
+              totalAmount: total,
+            };
+
+            await axios.post(
+              `${import.meta.env.VITE_API_URL}/api/payment/verify-payment`,
+              verificationPayload,
+              config
+            );
+
+            toast.success('Payment successful and order placed!');
+            navigate('/order-success');
+          } catch (error) {
+            console.error('Error verifying payment:', error);
+            const message =
+              error.response?.data?.message ||
+              'Payment succeeded but verification failed. Please contact support.';
+            toast.error(message);
+          } finally {
+            setRazorpayLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setRazorpayLoading(false);
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error('Error initiating Razorpay payment:', error);
+      const message =
+        error.response?.data?.message ||
+        'Failed to initiate payment. Please try again.';
+      toast.error(message);
+      setRazorpayLoading(false);
+    }
+  };
+
 
   // ✅ FIXED: Calculate values correctly
   const subtotal = cartItems.reduce((acc, item) => acc + item.quantity * item.product.price, 0);
@@ -369,6 +522,14 @@ const Checkout = () => {
                 className="w-full mt-8 bg-black text-white py-4 rounded uppercase tracking-widest hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Place Order
+              </button>
+              <button
+                type="button"
+                onClick={handleRazorpayPayment}
+                disabled={cartItems.length === 0 || !selectedAddress || razorpayLoading}
+                className="w-full mt-3 bg-rose-600 text-white py-3 rounded uppercase tracking-widest hover:bg-rose-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {razorpayLoading ? 'Processing payment...' : 'Pay Online with Razorpay'}
               </button>
            </div>
         </div>
