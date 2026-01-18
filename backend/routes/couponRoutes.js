@@ -6,6 +6,7 @@ const Coupon = require('../models/Coupon');
 const User = require('../models/User');
 const Order = require('../models/Order');
 
+
 // @desc    Get all coupons (Admin)
 // @route   GET /api/coupons
 // @access  Private/Admin
@@ -20,6 +21,7 @@ router.get(
     res.json(coupons);
   })
 );
+
 
 // @desc    Create coupon (Admin)
 // @route   POST /api/coupons
@@ -43,11 +45,13 @@ router.post(
       description,
     } = req.body;
 
+
     const existing = await Coupon.findOne({ code: code.toUpperCase().trim() });
     if (existing) {
       res.status(400);
       throw new Error('Coupon code already exists');
     }
+
 
     let allowedUsers = [];
     if (restrictedToUserEmail) {
@@ -60,6 +64,7 @@ router.post(
       }
       allowedUsers = [user._id];
     }
+
 
     const coupon = await Coupon.create({
       code: code.toUpperCase().trim(),
@@ -75,10 +80,12 @@ router.post(
       description,
     });
 
+
     const created = await coupon.populate('allowedUsers', 'email');
     res.status(201).json(created);
   })
 );
+
 
 // @desc    Update coupon (Admin)
 // @route   PUT /api/coupons/:id
@@ -102,12 +109,15 @@ router.put(
       description,
     } = req.body;
 
+
     const coupon = await Coupon.findById(req.params.id);
+
 
     if (!coupon) {
       res.status(404);
       throw new Error('Coupon not found');
     }
+
 
     if (code && code.toUpperCase().trim() !== coupon.code) {
       const existing = await Coupon.findOne({ code: code.toUpperCase().trim() });
@@ -117,6 +127,7 @@ router.put(
       }
       coupon.code = code.toUpperCase().trim();
     }
+
 
     if (discountType) coupon.discountType = discountType;
     if (typeof discountValue === 'number') coupon.discountValue = discountValue;
@@ -135,6 +146,7 @@ router.put(
       coupon.description = description;
     }
 
+
     if (restrictedToUserEmail !== undefined) {
       if (restrictedToUserEmail) {
         const user = await User.findOne({
@@ -150,11 +162,13 @@ router.put(
       }
     }
 
+
     const updated = await coupon.save();
     const populated = await updated.populate('allowedUsers', 'email');
     res.json(populated);
   })
 );
+
 
 // @desc    Delete coupon (Admin)
 // @route   DELETE /api/coupons/:id
@@ -174,18 +188,26 @@ router.delete(
   })
 );
 
-// @desc    Validate coupon for current user and order total
+
+// @desc    Validate coupon for current user and cart value
 // @route   POST /api/coupons/validate
 // @access  Private
+// ✅ UPDATED: Now accepts cartValue (excluding shipping) separately from orderTotal
 router.post(
   '/validate',
   protect,
   asyncHandler(async (req, res) => {
-    const { code, orderTotal } = req.body;
+    const { code, cartValue, orderTotal } = req.body;
 
-    if (!code || !orderTotal || orderTotal <= 0) {
+    // ✅ VALIDATION: Require both cartValue and orderTotal
+    if (!code || cartValue === undefined || orderTotal === undefined) {
       res.status(400);
-      throw new Error('Coupon code and valid order total are required');
+      throw new Error('Coupon code, cart value, and order total are required');
+    }
+
+    if (cartValue <= 0 || orderTotal <= 0) {
+      res.status(400);
+      throw new Error('Cart value and order total must be greater than 0');
     }
 
     const normalizedCode = code.toUpperCase().trim();
@@ -213,10 +235,11 @@ router.post(
       throw new Error('Coupon usage limit reached');
     }
 
-    if (coupon.minOrderValue && orderTotal < coupon.minOrderValue) {
+    // ✅ FIXED: Check minimum order value against cartValue ONLY, not orderTotal with shipping
+    if (coupon.minOrderValue && cartValue < coupon.minOrderValue) {
       res.status(400);
       throw new Error(
-        `Minimum order value for this coupon is INR ${coupon.minOrderValue}`
+        `Minimum cart value for this coupon is INR ${coupon.minOrderValue}`
       );
     }
 
@@ -252,26 +275,34 @@ router.post(
       }
     }
 
+    // ✅ FIXED: Calculate discount ONLY on cartValue, NOT on orderTotal with shipping
     let discountAmount = 0;
     if (coupon.discountType === 'percentage') {
-      discountAmount = (orderTotal * coupon.discountValue) / 100;
+      discountAmount = (cartValue * coupon.discountValue) / 100;
     } else {
       discountAmount = coupon.discountValue;
     }
 
-    if (discountAmount > orderTotal) {
-      discountAmount = orderTotal;
+    // ✅ FIXED: Cap discount to cartValue only
+    if (discountAmount > cartValue) {
+      discountAmount = cartValue;
     }
 
-    const finalTotal = orderTotal - discountAmount;
+    // ✅ FIXED: Final total = (cartValue - discount) + shipping
+    // The frontend already calculated shipping based on cartValue
+    const shippingCost = orderTotal - cartValue; // This will be 0 if free, 100 if paid
+    const discountedCartValue = cartValue - discountAmount;
+    const finalTotal = discountedCartValue + shippingCost;
 
     res.json({
       code: coupon.code,
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
-      discountAmount,
-      originalTotal: orderTotal,
-      finalTotal,
+      discountAmount, // ✅ Discount applied to cart only
+      originalCartValue: cartValue, // ✅ Original cart subtotal
+      shippingCost, // ✅ Shipping cost (separate)
+      originalTotal: orderTotal, // ✅ Original total with shipping
+      finalTotal, // ✅ (cartValue - discount) + shipping
       minOrderValue: coupon.minOrderValue,
       isFirstOrderOnly: coupon.isFirstOrderOnly,
       isActive: coupon.isActive,
@@ -279,5 +310,5 @@ router.post(
   })
 );
 
-module.exports = router;
 
+module.exports = router;

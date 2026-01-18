@@ -3,17 +3,19 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+
 const Checkout = () => {
   const [cartItems, setCartItems] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [loading, setLoading] = useState(true);
-   const [couponCode, setCouponCode] = useState('');
-   const [appliedCoupon, setAppliedCoupon] = useState(null);
-   const [couponLoading, setCouponLoading] = useState(false);
-   const [couponError, setCouponError] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
   const navigate = useNavigate();
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -23,6 +25,7 @@ const Checkout = () => {
           navigate('/login');
           return;
         }
+
 
         let userInfo;
         try {
@@ -34,11 +37,13 @@ const Checkout = () => {
           return;
         }
 
+
         const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
         
         // Fetch Cart
         const cartRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/cart`, config);
         setCartItems(cartRes.data.items || []);
+
 
         // Fetch Addresses (Profile)
         const profileRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/profile`, config);
@@ -57,11 +62,13 @@ const Checkout = () => {
     fetchData();
   }, [navigate]);
 
+
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Please enter a coupon code.');
       return;
     }
+
 
     try {
       const storedUserInfo = localStorage.getItem('userInfo');
@@ -69,6 +76,7 @@ const Checkout = () => {
         navigate('/login');
         return;
       }
+
 
       let userInfo;
       try {
@@ -80,26 +88,34 @@ const Checkout = () => {
         return;
       }
 
-      const subtotalValue = cartItems.reduce(
+
+      // ✅ FIXED: Calculate cartValue (subtotal) and orderTotal separately
+      const cartValue = cartItems.reduce(
         (acc, item) => acc + item.quantity * item.product.price,
         0
       );
-      const shippingValue = subtotalValue > 999 ? 0 : 100;
-      const orderTotal = subtotalValue + shippingValue;
+      const shippingValue = cartValue > 999 ? 0 : 100;
+      const orderTotal = cartValue + shippingValue;
+
 
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+
 
       setCouponLoading(true);
       setCouponError('');
 
+
+      // ✅ FIXED: Send both cartValue and orderTotal separately
       const { data } = await axios.post(
         `${import.meta.env.VITE_API_URL}/api/coupons/validate`,
         {
           code: couponCode,
-          orderTotal,
+          cartValue, // ✅ Subtotal only (without shipping)
+          orderTotal, // ✅ Subtotal + shipping
         },
         config
       );
+
 
       setAppliedCoupon(data);
       toast.success(
@@ -117,11 +133,13 @@ const Checkout = () => {
     }
   };
 
+
   const handlePlaceOrder = async () => {
     if (!selectedAddress) {
       toast.error('Please select or add a shipping address.');
       return;
     }
+
 
     // ✅ VALIDATE ADDRESS HAS ALL REQUIRED FIELDS
     if (!selectedAddress.street || !selectedAddress.city || !selectedAddress.state || 
@@ -131,12 +149,14 @@ const Checkout = () => {
       return;
     }
 
+
     try {
       const storedUserInfo = localStorage.getItem('userInfo');
       if (!storedUserInfo) {
         navigate('/login');
         return;
       }
+
 
       let userInfo;
       try {
@@ -147,6 +167,7 @@ const Checkout = () => {
         navigate('/login');
         return;
       }
+
 
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       
@@ -171,7 +192,9 @@ const Checkout = () => {
         couponCode: appliedCoupon?.code || undefined
       };
 
+
       console.log('Sending order data:', orderData); // ✅ DEBUG LOG
+
 
       await axios.post(`${import.meta.env.VITE_API_URL}/api/orders`, orderData, config);
       
@@ -184,13 +207,17 @@ const Checkout = () => {
     }
   };
 
+
+  // ✅ FIXED: Calculate values correctly
   const subtotal = cartItems.reduce((acc, item) => acc + item.quantity * item.product.price, 0);
   const shipping = subtotal > 999 ? 0 : 100;
   const originalTotal = subtotal + shipping;
   const total = appliedCoupon?.finalTotal || originalTotal;
-  const discount = Math.max(0, originalTotal - total);
+  const discount = Math.max(0, appliedCoupon ? appliedCoupon.discountAmount : 0);
+
 
   if (loading) return <div className="text-center py-20">Loading Checkout...</div>;
+
 
   return (
     <div className="container mx-auto px-6 py-24 min-h-screen">
@@ -236,6 +263,7 @@ const Checkout = () => {
             )}
           </div>
 
+
           {/* Payment Section */}
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
             <h2 className="text-2xl font-serif mb-6">Payment Method</h2>
@@ -258,6 +286,7 @@ const Checkout = () => {
             </div>
           </div>
         </div>
+
 
         {/* Right Side: Order Summary */}
         <div className="lg:w-1/3">
@@ -309,6 +338,7 @@ const Checkout = () => {
                 )}
               </div>
 
+
               <div className="border-t border-gray-300 pt-4 space-y-2 mt-6">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
@@ -332,6 +362,7 @@ const Checkout = () => {
                 </div>
               </div>
 
+
               <button 
                 onClick={handlePlaceOrder}
                 disabled={cartItems.length === 0 || !selectedAddress}
@@ -345,5 +376,6 @@ const Checkout = () => {
     </div>
   );
 };
+
 
 export default Checkout;
