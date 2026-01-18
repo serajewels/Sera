@@ -420,23 +420,10 @@ const Checkout = () => {
           {/* Payment Section */}
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
             <h2 className="text-2xl font-serif mb-6">Payment Method</h2>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 p-4 border rounded cursor-pointer hover:bg-gray-50">
-                <input 
-                  type="radio" 
-                  name="payment" 
-                  value="cod" 
-                  checked={paymentMethod === 'cod'} 
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="text-rose-500 focus:ring-rose-500"
-                />
-                <span className="font-medium">Cash on Delivery</span>
-              </label>
-              <label className="flex items-center gap-3 p-4 border rounded cursor-not-allowed opacity-50">
-                 <input type="radio" name="payment" disabled />
-                 <span>Credit/Debit Card (Coming Soon)</span>
-              </label>
-            </div>
+            <p className="text-gray-700 text-sm">
+              All orders are paid online securely via Razorpay. You will be redirected to the
+              Razorpay payment gateway after clicking Place Order.
+            </p>
           </div>
         </div>
 
@@ -517,19 +504,11 @@ const Checkout = () => {
 
 
               <button 
-                onClick={handlePlaceOrder}
-                disabled={cartItems.length === 0 || !selectedAddress}
-                className="w-full mt-8 bg-black text-white py-4 rounded uppercase tracking-widest hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Place Order
-              </button>
-              <button
-                type="button"
                 onClick={handleRazorpayPayment}
                 disabled={cartItems.length === 0 || !selectedAddress || razorpayLoading}
-                className="w-full mt-3 bg-rose-600 text-white py-3 rounded uppercase tracking-widest hover:bg-rose-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-8 bg-black text-white py-4 rounded uppercase tracking-widest hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {razorpayLoading ? 'Processing payment...' : 'Pay Online with Razorpay'}
+                {razorpayLoading ? 'Processing payment...' : 'Place Order'}
               </button>
            </div>
         </div>
