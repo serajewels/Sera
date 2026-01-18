@@ -498,6 +498,7 @@ const FloatingGallerySection = () => {
               {/* Subtle brightness lift */}
               <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </div>
+            
 
             {/* OPTION 2: Light Pink Bloom - Uncomment to use
             <div className={`${item.height} relative overflow-hidden rounded-2xl shadow-lg group-hover:shadow-2xl transition-all duration-500`}>

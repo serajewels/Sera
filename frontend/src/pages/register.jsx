@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
+
 const Register = () => {
   const [step, setStep] = useState(1); // 1: Registration, 2: OTP Verification
   const [name, setName] = useState('');
@@ -16,10 +17,12 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
 
     try {
       const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/register`, { 
@@ -37,10 +40,12 @@ const Register = () => {
     }
   };
 
+
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
 
     try {
       const { data } = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, { 
@@ -56,9 +61,11 @@ const Register = () => {
     }
   };
 
+
   const handleResendOTP = async () => {
     setError('');
     setLoading(true);
+
 
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/resend-otp`, { email });
@@ -70,17 +77,22 @@ const Register = () => {
     }
   };
 
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-rose-50 py-12 px-4 sm:px-6 lg:px-8 mt-[36px]">
        <div className="flex w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex-row-reverse">
-          <div className="hidden md:block w-1/2 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1617038224558-28ad3fb558a7?q=80&w=2070&auto=format&fit=crop')" }}>
-            <div className="h-full w-full bg-black/20 flex items-center justify-center">
-               <div className="text-white text-center p-8">
+          <div 
+            className="hidden md:block w-1/2 bg-cover bg-center" 
+            style={{ backgroundImage: "url('/images/image-1767118703079.jpg')" }}
+          >
+            <div className="h-full w-full bg-gradient-to-br from-rose-900/30 via-pink-800/20 to-transparent flex items-center justify-center">
+               <div className="text-white text-center p-8 drop-shadow-lg">
                   <h3 className="text-3xl font-serif mb-4">Join the Legacy</h3>
                   <p className="font-light tracking-wider">Start your journey with timeless elegance.</p>
                </div>
             </div>
           </div>
+
 
           <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
             <motion.div 
@@ -176,6 +188,7 @@ const Register = () => {
                           {loading ? 'Verifying...' : 'Verify Email'}
                       </button>
 
+
                       <button 
                         type="button"
                         onClick={handleResendOTP}
@@ -188,6 +201,7 @@ const Register = () => {
                 </>
               )}
 
+
               <div className="mt-8 text-center text-sm text-gray-600">
                 <p>Already have an account? <Link to="/login" className="text-[#c5a666] font-semibold hover:underline">Log in</Link></p>
               </div>
@@ -197,5 +211,6 @@ const Register = () => {
     </div>
   );
 };
+
 
 export default Register;
