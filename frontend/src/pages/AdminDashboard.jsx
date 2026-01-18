@@ -1571,6 +1571,12 @@ const AdminDashboard = () => {
                             .join(' ')
                         : 'Unknown'}
                     </span>
+                    {order.status === 'cancelled' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Cancelled from:{' '}
+                        {order.cancellationFee > 0 ? 'Processing' : 'Pending'}
+                      </p>
+                    )}
                     {order.exchangeReason && (
                       <p className="text-xs text-gray-500 mt-1">
                         Reason: {order.exchangeReason.replace('_', ' ')}
