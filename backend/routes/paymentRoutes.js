@@ -73,6 +73,8 @@ router.post(
       orderItems,
       shippingAddress,
       totalAmount,
+      couponCode,
+      discountAmount,
     } = req.body;
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -170,6 +172,8 @@ router.post(
       razorpayPaymentId: razorpay_payment_id,
       razorpaySignature: razorpay_signature,
       invoiceNumber: `INV-${Date.now()}`,
+      couponCode: couponCode || undefined,
+      couponDiscount: discountAmount || 0,
     });
 
     const createdOrder = await order.save();
@@ -187,4 +191,3 @@ router.post(
 );
 
 module.exports = router;
-

@@ -321,6 +321,8 @@ const Checkout = () => {
                 landmark: selectedAddress.landmark || '',
               },
               totalAmount: total,
+              couponCode: appliedCoupon?.code || null,
+              discountAmount: appliedCoupon?.discountAmount || 0,
             };
 
             await axios.post(

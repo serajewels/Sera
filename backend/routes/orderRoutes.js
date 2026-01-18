@@ -319,14 +319,18 @@ router.get('/:id/invoice', protect, asyncHandler(async (req, res) => {
     (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
     0
   );
+  const shippingRawBase =
+    subtotalRaw > 999 ? 0 : subtotalRaw > 0 ? 100 : 0;
   const discountRaw = order.couponDiscount || 0;
-  const grandTotalRaw = order.totalPrice || subtotalRaw - discountRaw;
-  const shippingRaw = Math.max(0, grandTotalRaw - (subtotalRaw - discountRaw));
+  const grandTotalRaw =
+    typeof order.totalPrice === 'number'
+      ? order.totalPrice
+      : subtotalRaw + shippingRawBase - discountRaw;
 
   const subtotal = formatAmount(subtotalRaw);
   const discount = formatAmount(discountRaw);
   const grandTotal = formatAmount(grandTotalRaw);
-  const shippingAmount = formatAmount(shippingRaw);
+  const shippingAmount = formatAmount(shippingRawBase);
 
   doc
     .font('Helvetica')
@@ -368,7 +372,7 @@ router.get('/:id/invoice', protect, asyncHandler(async (req, res) => {
     .font('Helvetica')
     .fontSize(9)
     .text(
-      'Thank you for shopping with Sera JEwellery.',
+      'Thank you for shopping with Sera Jewellery.',
       50,
       doc.y + 20,
       {
