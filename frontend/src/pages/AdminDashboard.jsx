@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaTimes, FaCheck, FaSearch, FaFilter, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaTimes, FaCheck, FaSearch, FaFilter, FaChevronLeft, FaChevronRight, FaDownload } from 'react-icons/fa';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -212,6 +212,44 @@ const AdminDashboard = () => {
       return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo && matchesMinPrice && matchesMaxPrice;
     });
   }, [debouncedSearch, filters]);
+
+  const downloadInvoice = async (orderId) => {
+    try {
+      const ui = getUserInfo();
+      if (!ui) {
+        navigate('/login');
+        return;
+      }
+      const config = {
+        headers: { Authorization: `Bearer ${ui.token}` },
+        responseType: 'blob'
+      };
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/invoice`,
+        config
+      );
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Invoice-${String(orderId).substring(0, 8)}.pdf`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      alert('Failed to download invoice');
+    }
+  };
 
   const filterCoupons = useCallback(
     (items) => {
@@ -1558,6 +1596,13 @@ const AdminDashboard = () => {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => downloadInvoice(order._id)}
+                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title="Download Invoice"
+                          >
+                            <FaDownload />
+                          </button>
                           {order.status !== 'cancelled' && order.status !== 'exchanged' && (
                             <select
                               value={order.status || 'pending'}

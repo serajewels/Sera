@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const asyncHandler = require('express-async-handler');
+const PDFDocument = require('pdfkit');
 const { protect } = require('../middleware/authMiddleware');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -198,6 +199,149 @@ router.get('/:id', protect, asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Order not found');
   }
+}));
+
+// @desc    Generate invoice PDF for an order
+// @route   GET /api/orders/:id/invoice
+// @access  Private (user or admin)
+router.get('/:id/invoice', protect, asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id)
+    .populate('user', 'name email')
+    .populate('items.product');
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  if (req.user.role !== 'admin' && !order.user._id.equals(req.user._id)) {
+    res.status(401);
+    throw new Error('Not authorized to view this invoice');
+  }
+
+  const doc = new PDFDocument({ margin: 50 });
+
+  const invoiceNo = order.invoiceNumber || `INV-${order._id.toString().slice(-8)}`;
+  const fileName = `Invoice-${invoiceNo}.pdf`;
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+
+  doc.pipe(res);
+
+  doc
+    .fontSize(20)
+    .text('Sera Jewelry', { align: 'left' });
+
+  doc
+    .fontSize(10)
+    .moveDown(0.5)
+    .text('Invoice', { align: 'right' });
+
+  doc
+    .fontSize(10)
+    .text(`Invoice No: ${invoiceNo}`, { align: 'right' })
+    .text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, {
+      align: 'right',
+    })
+    .moveDown(1);
+
+  doc
+    .fontSize(10)
+    .text('Billed To:', { underline: true })
+    .moveDown(0.3)
+    .text(order.user?.name || 'Customer')
+    .text(order.shippingAddress.street || '')
+    .text(
+      `${order.shippingAddress.city || ''}, ${order.shippingAddress.state || ''}`
+    )
+    .text(
+      `${order.shippingAddress.postalCode || ''}, ${
+        order.shippingAddress.country || 'India'
+      }`
+    )
+    .text(order.shippingAddress.phone || '')
+    .moveDown(1);
+
+  const tableTop = doc.y + 10;
+
+  const itemX = 50;
+  const qtyX = 280;
+  const priceX = 340;
+  const totalX = 430;
+
+  doc.fontSize(10).text('Item', itemX, tableTop);
+  doc.text('Qty', qtyX, tableTop);
+  doc.text('Price', priceX, tableTop);
+  doc.text('Total', totalX, tableTop);
+
+  doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+  let currentY = tableTop + 25;
+
+  order.items.forEach((item) => {
+    const name = item.name || item.product?.name || 'Product';
+    const quantity = item.quantity || 1;
+    const price = item.price || item.product?.price || 0;
+    const lineTotal = price * quantity;
+
+    doc.text(name, itemX, currentY, { width: 200 });
+    doc.text(String(quantity), qtyX, currentY);
+    doc.text(`INR ${price}`, priceX, currentY);
+    doc.text(`INR ${lineTotal}`, totalX, currentY);
+
+    currentY += 18;
+  });
+
+  doc.moveDown(2);
+
+  const summaryY = currentY + 10;
+
+  const subtotal = order.items.reduce(
+    (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
+    0
+  );
+  const discount = order.couponDiscount || 0;
+  const grandTotal = order.totalPrice || subtotal - discount;
+
+  doc
+    .fontSize(10)
+    .text(`Subtotal: INR ${subtotal}`, totalX - 50, summaryY, {
+      align: 'right',
+    });
+
+  if (discount > 0) {
+    doc
+      .text(`Discount: - INR ${discount}`, totalX - 50, summaryY + 15, {
+        align: 'right',
+      })
+      .text(
+        `Coupon: ${order.couponCode || ''}`,
+        totalX - 50,
+        summaryY + 30,
+        { align: 'right' }
+      );
+  }
+
+  doc
+    .fontSize(11)
+    .text(`Total: INR ${grandTotal}`, totalX - 50, summaryY + 50, {
+      align: 'right',
+    });
+
+  doc
+    .moveDown(3)
+    .fontSize(9)
+    .text(
+      'Thank you for shopping with Sera Jewelry.',
+      50,
+      doc.y + 20,
+      {
+        align: 'center',
+      }
+    );
+
+  doc.end();
 }));
 
 // @desc    Get all orders (Admin)

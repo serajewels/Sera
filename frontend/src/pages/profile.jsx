@@ -119,6 +119,45 @@ const Profile = () => {
     }
   };
 
+  const downloadInvoice = async (orderId) => {
+    try {
+      if (!userInfo || !userInfo.token) {
+        navigate('/login');
+        return;
+      }
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+        responseType: 'blob',
+      };
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/orders/${orderId}/invoice`,
+        config
+      );
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Invoice-${String(orderId).substring(0, 8)}.pdf`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.error('Failed to download invoice');
+    }
+  };
+
   const handleExchangeRequest = async () => {
     if (!exchangeReason) {
       toast.error('Please select a reason for exchange');
@@ -479,8 +518,13 @@ const Profile = () => {
                           </div>
                         ))}
                         
-                        {/* Cancel/Exchange Buttons */}
                         <div className="mt-4 pt-4 border-t border-gray-100 flex gap-3 flex-wrap">
+                          <button
+                            onClick={() => downloadInvoice(order._id)}
+                            className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50 transition-colors"
+                          >
+                            Download Invoice
+                          </button>
                           {canCancelOrder(order) && (
                             <button
                               onClick={() => handleCancelOrder(order._id)}
