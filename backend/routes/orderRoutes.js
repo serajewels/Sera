@@ -10,6 +10,7 @@ const Product = require('../models/Product');
 const Cart = require('../models/Cart');
 const Coupon = require('../models/Coupon');
 
+
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
@@ -49,36 +50,46 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 
   if (couponCode) {
     const normalizedCode = couponCode.toUpperCase().trim();
-    const coupon = await Coupon.findOne({ code: normalizedCode });
 
-    if (!coupon || !coupon.isActive) {
+    // ✅ ATOMIC: Check AND increment coupon usage in one operation
+    const coupon = await Coupon.findOneAndUpdate(
+      {
+        code: normalizedCode,
+        isActive: true,
+        // Check expiry date
+        $or: [
+          { expiryDate: null },
+          { expiryDate: { $gte: new Date() } }
+        ],
+        // Check usage limit
+        $or: [
+          { usageLimit: null },
+          { $expr: { $lt: ['$usageCount', '$usageLimit'] } }
+        ]
+      },
+      { $inc: { usageCount: 1 } },
+      { new: true }
+    );
+
+    if (!coupon) {
       res.status(400);
-      throw new Error('Invalid or inactive coupon');
+      throw new Error('Invalid, expired, or usage limit reached for coupon');
     }
 
-    const now = new Date();
-
-    if (coupon.expiryDate && coupon.expiryDate < now) {
-      res.status(400);
-      throw new Error('Coupon has expired');
-    }
-
-    if (
-      typeof coupon.usageLimit === 'number' &&
-      coupon.usageLimit >= 0 &&
-      coupon.usageCount >= coupon.usageLimit
-    ) {
-      res.status(400);
-      throw new Error('Coupon usage limit reached');
-    }
-
+    // ✅ VALIDATE MINIMUM ORDER VALUE
     if (coupon.minOrderValue && totalPrice < coupon.minOrderValue) {
+      // Rollback: decrement usage count since this order will fail
+      await Coupon.findByIdAndUpdate(
+        coupon._id,
+        { $inc: { usageCount: -1 } }
+      );
       res.status(400);
       throw new Error(
         `Minimum order value for this coupon is INR ${coupon.minOrderValue}`
       );
     }
 
+    // ✅ VALIDATE ALLOWED USERS
     if (
       coupon.allowedUsers &&
       coupon.allowedUsers.length > 0 &&
@@ -86,19 +97,31 @@ router.post('/', protect, asyncHandler(async (req, res) => {
         (u) => u.toString() === req.user._id.toString()
       )
     ) {
+      // Rollback: decrement usage count
+      await Coupon.findByIdAndUpdate(
+        coupon._id,
+        { $inc: { usageCount: -1 } }
+      );
       res.status(400);
       throw new Error('This coupon is not valid for your account');
     }
 
+    // ✅ VALIDATE FIRST ORDER ONLY
     const userOrderCount = await Order.countDocuments({ user: req.user._id });
 
     if (coupon.isFirstOrderOnly) {
       if (userOrderCount > 0) {
+        // Rollback: decrement usage count
+        await Coupon.findByIdAndUpdate(
+          coupon._id,
+          { $inc: { usageCount: -1 } }
+        );
         res.status(400);
         throw new Error('This coupon is only valid on your first order');
       }
     }
 
+    // ✅ VALIDATE PER USER LIMIT
     if (coupon.perUserLimit && coupon.perUserLimit > 0) {
       const userCouponUsage = await Order.countDocuments({
         user: req.user._id,
@@ -106,11 +129,17 @@ router.post('/', protect, asyncHandler(async (req, res) => {
       });
 
       if (userCouponUsage >= coupon.perUserLimit) {
+        // Rollback: decrement usage count
+        await Coupon.findByIdAndUpdate(
+          coupon._id,
+          { $inc: { usageCount: -1 } }
+        );
         res.status(400);
         throw new Error('You have already used this coupon the maximum number of times');
       }
     }
 
+    // ✅ CALCULATE DISCOUNT
     if (coupon.discountType === 'percentage') {
       couponDiscount = (totalPrice * coupon.discountValue) / 100;
     } else {
@@ -158,11 +187,6 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 
   const createdOrder = await order.save();
 
-  if (appliedCoupon) {
-    appliedCoupon.usageCount = (appliedCoupon.usageCount || 0) + 1;
-    await appliedCoupon.save();
-  }
-
   // Clear the user's cart
   await Cart.findOneAndUpdate(
     { user: req.user._id },
@@ -171,6 +195,7 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 
   res.status(201).json(createdOrder);
 }));
+
 
 // @desc    Get logged in user orders
 // @route   GET /api/orders
@@ -181,6 +206,7 @@ router.get('/', protect, asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 });
   res.json(orders);
 }));
+
 
 // @desc    Get order by ID
 // @route   GET /api/orders/:id
@@ -202,6 +228,7 @@ router.get('/:id', protect, asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 }));
+
 
 // @desc    Generate invoice PDF for an order
 // @route   GET /api/orders/:id/invoice
@@ -383,6 +410,7 @@ router.get('/:id/invoice', protect, asyncHandler(async (req, res) => {
   doc.end();
 }));
 
+
 // @desc    Get all orders (Admin)
 // @route   GET /api/orders/all/admin
 // @access  Private/Admin
@@ -398,6 +426,7 @@ router.get('/all/admin', protect, asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 });
   res.json(orders);
 }));
+
 
 // @desc    Update order status (Admin)
 // @route   PUT /api/orders/:id/status
@@ -426,6 +455,7 @@ router.put('/:id/status', protect, asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 }));
+
 
 // @desc    Cancel order (User or Admin)
 // @route   PUT /api/orders/:id/cancel
@@ -469,6 +499,14 @@ router.put('/:id/cancel', protect, asyncHandler(async (req, res) => {
     );
   }
 
+  // ✅ RESTORE COUPON USAGE COUNT on cancellation
+  if (order.couponCode) {
+    await Coupon.findOneAndUpdate(
+      { code: order.couponCode },
+      { $inc: { usageCount: -1 } }
+    );
+  }
+
   order.status = 'cancelled';
   order.cancellationFee = cancellationFee;
   order.refundAmount = order.totalPrice - cancellationFee;
@@ -476,6 +514,7 @@ router.put('/:id/cancel', protect, asyncHandler(async (req, res) => {
 
   res.json(updatedOrder);
 }));
+
 
 // @desc    Request exchange (User only - within 3 days of delivery)
 // @route   PUT /api/orders/:id/exchange
@@ -524,6 +563,7 @@ router.put('/:id/exchange', protect, asyncHandler(async (req, res) => {
   res.json(updatedOrder);
 }));
 
+
 // @desc    Approve/Reject exchange (Admin)
 // @route   PUT /api/orders/:id/exchange/approve
 // @access  Private/Admin
@@ -566,6 +606,7 @@ router.put('/:id/exchange/approve', protect, asyncHandler(async (req, res) => {
   const updatedOrder = await order.save();
   res.json(updatedOrder);
 }));
+
 
 // @desc    Update order details (Admin)
 // @route   PUT /api/orders/:id/update
@@ -673,5 +714,6 @@ router.put('/:id/update', protect, asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 }));
+
 
 module.exports = router;
