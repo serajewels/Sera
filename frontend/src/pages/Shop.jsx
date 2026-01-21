@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaFilter, FaSearch, FaShoppingCart, FaTimes, FaCheck, FaChevronLeft, FaChevronRight, FaStar } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
+
 // Custom Hook: Synchronize URL params with state (prevents race conditions)
 const useURLSync = () => {
   const location = useLocation();
@@ -21,6 +22,7 @@ const useURLSync = () => {
     };
   }, [location.search]);
 
+
   const updateURLParams = useCallback((newParams) => {
     const params = new URLSearchParams();
     if (newParams.page && newParams.page > 1) params.set('page', newParams.page);
@@ -33,12 +35,15 @@ const useURLSync = () => {
     navigate(`/shop${params.toString() ? '?' + params.toString() : ''}`);
   }, [navigate]);
 
+
   return { getURLParams, updateURLParams, location };
 };
+
 
 const Shop = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 12;
+
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +57,7 @@ const Shop = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
 
+
   const { getURLParams, updateURLParams } = useURLSync();
   const navigate = useNavigate();
   const categories = ['All', 'Necklace', 'Earrings', 'Bracelet', 'Rings'];
@@ -59,6 +65,7 @@ const Shop = () => {
   // Use refs to prevent race conditions
   const abortControllerRef = useRef(null);
   const lastFetchParamsRef = useRef(null);
+
 
   // Memoized fetch params to prevent unnecessary refetches
   const fetchParams = useMemo(() => ({
@@ -71,6 +78,7 @@ const Shop = () => {
     sortBy,
   }), [currentPage, selectedCategory, selectedTags, searchQuery, priceRange, showInStock, sortBy]);
 
+
   // OPTIMIZED: Fetch products with proper async handling
   const fetchProducts = useCallback(async () => {
     // Cancel previous request if still pending
@@ -79,16 +87,19 @@ const Shop = () => {
     }
     abortControllerRef.current = new AbortController();
 
+
     setLoading(true);
     try {
       const paramKey = JSON.stringify(fetchParams);
       lastFetchParamsRef.current = paramKey;
+
 
       if (selectedTags.includes('bestseller')) {
         const { data } = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/products/bestsellers`,
           { signal: abortControllerRef.current.signal }
         );
+
 
         if (lastFetchParamsRef.current === paramKey) {
           const safeProducts = Array.isArray(data.products) ? data.products : [];
@@ -100,6 +111,7 @@ const Shop = () => {
         const params = new URLSearchParams();
         params.set('page', currentPage);
         params.set('limit', ITEMS_PER_PAGE);
+
 
         if (selectedCategory !== 'All') {
           params.set('category', selectedCategory.toLowerCase());
@@ -117,10 +129,12 @@ const Shop = () => {
           params.set('sort', sortBy);
         }
 
+
         const { data } = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/products?${params.toString()}`,
           { signal: abortControllerRef.current.signal }
         );
+
 
         // Only update state if this is still the latest request
         if (lastFetchParamsRef.current === paramKey) {
@@ -147,10 +161,12 @@ const Shop = () => {
     }
   }, [currentPage, selectedCategory, searchQuery, priceRange, showInStock, selectedTags, sortBy, fetchParams]);
 
+
   // Fetch when filter dependencies change
   useEffect(() => {
     fetchProducts();
   }, [fetchParams]);
+
 
   // Handle URL synchronization on mount and location change
   useEffect(() => {
@@ -168,12 +184,14 @@ const Shop = () => {
     }
   }, [getURLParams]);
 
+
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
     setCurrentPage(1);
     setShowFilters(false);
     updateURLParams({ category, page: 1, tags: selectedTags });
   };
+
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -182,6 +200,7 @@ const Shop = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
 
   const handleBestsellersToggle = () => {
     const newTags = selectedTags.includes('bestseller')
@@ -192,15 +211,18 @@ const Shop = () => {
     updateURLParams({ category: selectedCategory, page: 1, tags: newTags });
   };
 
+
   const addToCart = async (e, productId) => {
     e.preventDefault();
     e.stopPropagation();
+
 
     const userInfo = JSON.parse(localStorage.getItem('userInfo'));
     if (!userInfo) {
       navigate('/login?redirect=/shop');
       return;
     }
+
 
     try {
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
@@ -211,6 +233,7 @@ const Shop = () => {
       toast.error('Failed to add to cart');
     }
   };
+
 
   const renderProducts = () => {
     if (loading) {
@@ -231,6 +254,7 @@ const Shop = () => {
         </div>
       );
     }
+
 
     if (products.length === 0) {
       return (
@@ -265,6 +289,7 @@ const Shop = () => {
       );
     }
 
+
     return products.map(product => (
       <Link
         to={`/product/${product._id}`}
@@ -288,11 +313,13 @@ const Shop = () => {
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
 
+
             {product.stock === 0 && (
               <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
                 Out of Stock
               </div>
             )}
+
 
             <button
               onClick={(e) => addToCart(e, product._id)}
@@ -304,6 +331,7 @@ const Shop = () => {
             </button>
           </div>
 
+
           <div className="p-3 md:p-4 text-center">
             <h3 className="font-serif text-base md:text-lg text-gray-900 group-hover:text-rose-500 transition-colors mb-1 truncate">
               {product.name || 'Unnamed Product'}
@@ -311,48 +339,49 @@ const Shop = () => {
             <p className="text-gray-500 text-xs md:text-sm mb-2 capitalize truncate">
               {product.category || 'Uncategorized'}
             </p>
-            <div className="flex items-center justify-center gap-2">
-              <p className="text-lg md:text-xl font-medium text-gray-900">
-                INR {product.price?.toLocaleString() || 0}
-              </p>
-              {product.stock > 0 && product.stock <= 5 && (
-                <span className="text-xs text-orange-500 font-medium">
-                  Only {product.stock} left
-                </span>
-              )}
-            </div>
+            <p className="text-lg md:text-xl font-medium text-gray-900">
+              INR {product.price?.toLocaleString() || 0}
+            </p>
           </div>
         </motion.div>
       </Link>
     ));
   };
 
+
   const renderPagination = () => {
     if (totalPages <= 1) return null;
+
 
     const pageNumbers = [];
     const maxVisible = 5;
 
+
     let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
     let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
 
     if (endPage - startPage < maxVisible - 1) {
       startPage = Math.max(1, endPage - maxVisible + 1);
     }
+
 
     if (startPage > 1) {
       pageNumbers.push(1);
       if (startPage > 2) pageNumbers.push('...');
     }
 
+
     for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(i);
     }
+
 
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) pageNumbers.push('...');
       pageNumbers.push(totalPages);
     }
+
 
     return (
       <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
@@ -364,6 +393,7 @@ const Shop = () => {
         >
           <FaChevronLeft className="w-4 h-4" />
         </button>
+
 
         {pageNumbers.map((num, idx) => (
           <button
@@ -384,6 +414,7 @@ const Shop = () => {
           </button>
         ))}
 
+
         <button
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
@@ -395,6 +426,7 @@ const Shop = () => {
       </div>
     );
   };
+
 
   return (
     <div className="min-h-screen bg-white pt-16 md:pt-20">
@@ -417,6 +449,7 @@ const Shop = () => {
         </p>
       </div>
 
+
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-12">
         {/* Mobile Filter Button */}
         <button
@@ -425,6 +458,7 @@ const Shop = () => {
         >
           {showFilters ? <FaTimes className="w-5 h-5" /> : <FaFilter className="w-5 h-5" />}
         </button>
+
 
         <div className="flex flex-col lg:flex-row gap-6 md:gap-12">
           {/* Sidebar / Filters */}
@@ -451,6 +485,7 @@ const Shop = () => {
                   <FaTimes className="w-6 h-6" />
                 </button>
 
+
                 {/* Categories */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border mt-12 lg:mt-0">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -474,6 +509,7 @@ const Shop = () => {
                     ))}
                   </ul>
                 </div>
+
 
                 {/* Stock Filter */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
@@ -500,6 +536,7 @@ const Shop = () => {
                   </label>
                 </div>
 
+
                 {/* Bestseller Toggle */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -520,6 +557,7 @@ const Shop = () => {
                     </span>
                   </label>
                 </div>
+
 
                 {/* Sort By Dropdown */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
@@ -543,6 +581,7 @@ const Shop = () => {
                   </select>
                 </div>
 
+
                 {/* Search */}
                 <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border">
                   <h3 className="text-base md:text-lg font-serif font-bold mb-4 md:mb-6 flex items-center gap-2">
@@ -564,6 +603,7 @@ const Shop = () => {
             )}
           </AnimatePresence>
 
+
           {/* Overlay for mobile */}
           {showFilters && (
             <div
@@ -571,6 +611,7 @@ const Shop = () => {
               onClick={() => setShowFilters(false)}
             />
           )}
+
 
           {/* Product Grid */}
           <motion.div
@@ -587,9 +628,11 @@ const Shop = () => {
               </div>
             </div>
 
+
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {renderProducts()}
             </div>
+
 
             {!selectedTags.includes('bestseller') && renderPagination()}
           </motion.div>
@@ -598,5 +641,6 @@ const Shop = () => {
     </div>
   );
 };
+
 
 export default Shop;
