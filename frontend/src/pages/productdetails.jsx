@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { FaStar, FaHeart, FaMinus, FaPlus, FaShoppingCart, FaShare2 } from 'react-icons/fa';
+import { FaStar, FaHeart, FaMinus, FaPlus, FaShoppingCart, FaShareAlt } from 'react-icons/fa';
 
 
 
@@ -371,7 +371,7 @@ const ProductDetails = () => {
                   className="p-3 rounded-full bg-white/40 backdrop-blur-sm hover:bg-white/60 shadow-md hover:shadow-xl transition-all duration-300 text-2xl border border-white/50 hover:border-white/80"
                   title="Share this product"
                 >
-                  <FaShare2 className="text-gray-600 hover:text-rose-500 transition-colors" />
+                  <FaShareAlt className="text-gray-600 hover:text-rose-500 transition-colors" />
                 </motion.button>
 
                 {/* Share Menu */}
